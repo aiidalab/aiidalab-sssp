@@ -1,0 +1,10 @@
+*.pyc
+*.swo
+*.swp
+~*
+*~
+*.egg*
+.DS_Store
+.idea
+
+.vscode
