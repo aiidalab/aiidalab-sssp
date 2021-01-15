@@ -8,7 +8,7 @@ template = """
   <th style="text-align:center">Application sssp workflow</th>
 <tr>
   <td valign="top"><ul>
-    <li><a href="{appbase}/example.ipynb" target="_blank">Example notebook</a></li>
+    <li><a href="{appbase}/sssp-workflow.ipynb" target="_blank">sssp workflow</a></li>
   </ul></td>
 </tr>
 </table>

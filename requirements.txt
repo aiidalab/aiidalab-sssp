@@ -1,1 +1,4 @@
 aiidalab>=20.11.0
+aiida-pseudo~=0.4
+aiida-sssp-workflow
+-e git+git@github.com:unkcpz/aiida-quantumespresso.git@8e310adb05ac4d9762ab944863d1b63a052026a4#egg=aiida_quantumespresso
