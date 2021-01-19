@@ -2,9 +2,11 @@
 import traitlets
 import ipywidgets as ipw
 from IPython.display import clear_output, display
-from aiidalab_widgets_base.viewers import viewer
-from aiida.orm import ProcessNode
+from aiida.orm import ProcessNode, WorkChainNode
+from aiida.cmdline.utils.ascii_vis import format_call_graph
 from widgets import ProcessOutputFollower
+
+from viewers import viewer
 
 
 class ProgressBarWidget(ipw.VBox):
@@ -135,21 +137,22 @@ class ProcessOutputsWidget(ipw.VBox):
     process = traitlets.Instance(ProcessNode, allow_none=True)
 
     def __init__(self, process=None, **kwargs):
-        self.process = process
         self.output = ipw.Output()
         self.info = ipw.HTML()
         outputs_list = [(l.title(), l)
                         for l in self.process.outputs] if self.process else []
-        outputs = ipw.Dropdown(
+        self.outputs = ipw.Dropdown(
             options=[('Select output', '')] + outputs_list,
             label='Select output',
             description='Select outputs:',
             style={'description_width': 'initial'},
             disabled=False,
         )
-        outputs.observe(self.show_selected_output, names=['value'])
+        self.process = process
+        self.outputs.observe(self.show_selected_output, names=['value'])
         super().__init__(
-            children=[ipw.HBox([outputs, self.info]), self.output], **kwargs)
+            children=[ipw.HBox([self.outputs, self.info]), self.output],
+            **kwargs)
 
     def show_selected_output(self, change=None):
         """Function that displays process output selected in the `outputs` Dropdown widget."""
@@ -160,3 +163,89 @@ class ProcessOutputsWidget(ipw.VBox):
                 selected_output = self.process.outputs[change['new']]
                 self.info.value = "PK: {}".format(selected_output.id)
                 display(viewer(selected_output))
+
+    @traitlets.observe('process')
+    def _observe_process(self, change):
+        process = change['new']
+        outputs_list = [(l.title(), l)
+                        for l in process.outputs] if process else []
+        with self.outputs.hold_trait_notifications():
+            self.outputs.options = [('Select output', '')] + outputs_list
+
+
+class ProcessCallStackWidget(ipw.HTML):
+    """Widget that shows process call stack."""
+    process = traitlets.Instance(ProcessNode, allow_none=True)
+
+    def __init__(self,
+                 title="Process Call Stack",
+                 path_to_root='../',
+                 **kwargs):
+        self.title = title
+        self.path_to_root = path_to_root
+        self.update()
+        super().__init__(**kwargs)
+
+    def update(self):
+        """Update the call stack that is shown."""
+        if self.process is None:
+            return
+        string = format_call_graph(self.process, info_fn=self.calc_info)
+        self.value = string.replace('\n', '<br/>').replace(' ',
+                                                           '&nbsp;').replace(
+                                                               '#space#', ' ')
+
+    def calc_info(self, node):
+        """Return a string with the summary of the state of a CalculationNode."""
+
+        if not isinstance(node, ProcessNode):
+            raise TypeError('Unknown type: {}'.format(type(node)))
+
+        process_state = node.process_state.value.capitalize()
+        pk = """<a#space#href={0}aiidalab-widgets-base/process.ipynb?id={1}#space#target="_blank">{1}</a>""".format(
+            self.path_to_root, node.pk)
+
+        if node.exit_status is not None:
+            string = '{}<{}> {} [{}]'.format(node.process_label, pk,
+                                             process_state, node.exit_status)
+        else:
+            string = '{}<{}> {}'.format(node.process_label, pk, process_state)
+
+        if isinstance(node, WorkChainNode) and node.stepper_state_info:
+            string += ' [{}]'.format(node.stepper_state_info)
+        return string
+
+    @traitlets.observe('process')
+    def _observe_process(self, change):
+        self.update()
+
+
+class ProcessLinkWidget(ipw.HTML):
+    """A html link to the process show page"""
+    process = traitlets.Instance(ProcessNode, allow_none=True)
+
+    def __init__(self, path_to_root='../', **kwargs):
+        self.path_to_root = path_to_root
+        self.update()
+        super().__init__(**kwargs)
+
+    def update(self):
+        """Update the call stack that is shown."""
+        if self.process is None:
+            return
+        if not self.process.is_finished_ok:
+            string = 'The process is not finished ok yet.'
+            self.value = self._get_html_string(string)
+        else:
+            pk = """<a#space#href={0}aiidalab-sssp-workflow/check-verification-results.ipynb?id={1}#space#target="_blank">{1}</a>""".format(
+                self.path_to_root, self.process.pk)
+            string = f'Goto see verification result pk=<{pk}>.'
+            self.value = self._get_html_string(string)
+
+    def _get_html_string(self, string):
+        return string.replace('\n', '<br/>').replace(' ', '&nbsp;').replace(
+            '#space#', ' ')
+
+    @traitlets.observe('process')
+    def _observe_process(self, change):
+        self.update()

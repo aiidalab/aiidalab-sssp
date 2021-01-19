@@ -8,7 +8,8 @@ template = """
   <th style="text-align:center">Application sssp workflow</th>
 <tr>
   <td valign="top"><ul>
-    <li><a href="{appbase}/sssp-workflow.ipynb" target="_blank">sssp workflow</a></li>
+    <li><a href="{appbase}/sssp-delta-factor.ipynb" target="_blank">delta-factor workflow</a></li>
+    <li><a href="{appbase}/sssp-verification.ipynb" target="_blank">verification workflow</a></li>
   </ul></td>
 </tr>
 </table>
