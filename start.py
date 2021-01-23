@@ -10,6 +10,8 @@ template = """
   <td valign="top"><ul>
     <li><a href="{appbase}/sssp-delta-factor.ipynb" target="_blank">delta-factor workflow</a></li>
     <li><a href="{appbase}/sssp-verification.ipynb" target="_blank">verification workflow</a></li>
+    <li><a href="{appbase}/check-verification-results.ipynb" target="_blank"> check verification process</a></li>
+    <li><a href="{appbase}/bands-chessboard.ipynb" target="_blank">bands chessboard</a></li>
   </ul></td>
 </tr>
 </table>

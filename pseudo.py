@@ -62,7 +62,7 @@ class PseudoSelectionWidget(ipw.VBox):
             placeholder='[No pseudo selected]',
             description='Selected:',
             disabled=True,
-            layout=ipw.Layout(width='auto', flex="1 1 auto"),
+            layout=ipw.Layout(width='auto'),
         )
 
         self.confirm_button = ipw.Button(

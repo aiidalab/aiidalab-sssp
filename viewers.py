@@ -39,6 +39,8 @@ class XyDataViewer(ipw.VBox):
     _PLOT_WIDTH = 900
     _LINE_WIDTH = 2
     _LINE_COLOR = 'red'
+    _CIRCLE_SIZE = 8
+    _RES_COLOR = 'red'
 
     def __init__(self, xydata, **kwargs):
         from bokeh.io import show, output_notebook
@@ -66,6 +68,10 @@ class XyDataViewer(ipw.VBox):
                           y_data,
                           line_width=self._LINE_WIDTH,
                           line_color=self._LINE_COLOR)  # pylint: disable=too-many-function-args
+                plot.square(x_data,
+                           y_data,
+                           fill_color=self._RES_COLOR,
+                           size=self._CIRCLE_SIZE)
                 figure_list.append(plot)
 
             show(column(*figure_list))

@@ -4,7 +4,7 @@ import numpy as np
 
 def eos_birch_murnaghan(volume, E0, V0, B0, B1):
     'From Phys. Rev. B 70, 224107'
-    eta = (volume / V0)**(2.0 / 3.0)
+    eta = (V0 / volume)**(2.0 / 3.0)
     E = E0 + 9.0 * B0 * V0 / 16.0 * (eta - 1.0)**2 * (6.0 + B1 *
                                                       (eta - 1.0) - 4.0 * eta)
 

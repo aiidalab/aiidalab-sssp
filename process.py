@@ -99,15 +99,14 @@ class ProcessInputsWidget(ipw.VBox):
 
         self.output = ipw.Output()
         self.info = ipw.HTML()
-        inputs_list = [(l.title(), l)
-                       for l in self.process.inputs] if self.process else []
         self.inputs = ipw.Dropdown(
-            options=[('Select input', '')] + inputs_list,
+            options=[('Select input', '')],
             description='Select input:',
             style={'description_width': 'initial'},
             disabled=False,
         )
         self.process = process
+        self.update(process)
         self.inputs.observe(self.show_selected_input, names=['value'])
         super().__init__(
             children=[ipw.HBox([self.inputs, self.info]), self.output],
@@ -123,13 +122,15 @@ class ProcessInputsWidget(ipw.VBox):
                 self.info.value = "PK: {}".format(selected_input.id)
                 display(viewer(selected_input))
 
+    def update(self, process):
+        inputs_list = [(l.title(), l)
+                        for l in process.outputs] if process else []
+        self.inputs.options = [('Select input', '')] + inputs_list
+
     @traitlets.observe('process')
     def _observe_process(self, change):
         process = change['new']
-        inputs_list = [(l.title(), l)
-                       for l in process.inputs] if process else []
-        with self.inputs.hold_trait_notifications():
-            self.inputs.options = [('Select input', '')] + inputs_list
+        self.update(process)
 
 
 class ProcessOutputsWidget(ipw.VBox):
@@ -139,16 +140,16 @@ class ProcessOutputsWidget(ipw.VBox):
     def __init__(self, process=None, **kwargs):
         self.output = ipw.Output()
         self.info = ipw.HTML()
-        outputs_list = [(l.title(), l)
-                        for l in self.process.outputs] if self.process else []
         self.outputs = ipw.Dropdown(
-            options=[('Select output', '')] + outputs_list,
+            options=[('Select output', '')],
             label='Select output',
             description='Select outputs:',
             style={'description_width': 'initial'},
             disabled=False,
         )
         self.process = process
+        self.update(process)
+
         self.outputs.observe(self.show_selected_output, names=['value'])
         super().__init__(
             children=[ipw.HBox([self.outputs, self.info]), self.output],
@@ -164,13 +165,15 @@ class ProcessOutputsWidget(ipw.VBox):
                 self.info.value = "PK: {}".format(selected_output.id)
                 display(viewer(selected_output))
 
+    def update(self, process):
+        outputs_list = [(l.title(), l)
+                        for l in process.outputs] if process else []
+        self.outputs.options = [('Select output', '')] + outputs_list
+
     @traitlets.observe('process')
     def _observe_process(self, change):
         process = change['new']
-        outputs_list = [(l.title(), l)
-                        for l in process.outputs] if process else []
-        with self.outputs.hold_trait_notifications():
-            self.outputs.options = [('Select output', '')] + outputs_list
+        self.update(process)
 
 
 class ProcessCallStackWidget(ipw.HTML):

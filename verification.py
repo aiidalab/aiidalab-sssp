@@ -1,6 +1,8 @@
 """Widget for delta factor calculation"""
 import ipywidgets as ipw
 import traitlets
+import numpy as np
+import re
 
 from aiidalab_widgets_base import CodeDropdown
 
@@ -16,33 +18,44 @@ class ComputeVerificationWidget(ipw.VBox):
 
     process = traitlets.Instance(orm.ProcessNode, allow_none=True)
     input_pseudo = traitlets.Instance(UpfData, allow_none=True)
-    disabled = traitlets.Bool()
 
     skip = False
 
     def __init__(self, **kwargs):
-        setup_code_params = {
+        setup_pw_code_params = {
             "computer": "localhost",
             "description": "pw.x in AiiDAlab container.",
             "label": "pw",
             "input_plugin": "quantumespresso.pw",
             'remote_abs_path': '/usr/bin/pw.x',
         }
-        self.code_group = CodeDropdown(input_plugin='quantumespresso.pw',
-                                       text="Select code",
-                                       setup_code_params=setup_code_params)
+        setup_ph_code_params = {
+            "computer": "localhost",
+            "description": "ph.x in AiiDAlab container.",
+            "label": "ph",
+            "input_plugin": "quantumespresso.ph",
+            'remote_abs_path': '/usr/bin/ph.x',
+        }
+
+
+        pw_code = CodeDropdown(input_plugin='quantumespresso.pw',
+                               description="Pw code",
+                               setup_code_params=setup_pw_code_params)
+        ph_code = CodeDropdown(input_plugin='quantumespresso.ph',
+                               description="Ph code",
+                               setup_code_params=setup_ph_code_params)
+
+        self.code_group = ipw.VBox(children=[pw_code, ph_code])
 
         parameters_setting_prompt = ipw.HTML(
             "Select the compute parameters for this calculation.")
         parameters_setting_help = ipw.HTML(
-            """<div style="line-height:120%; padding-top:25px;">
-            <p>Parameters and their meaning in delta factor calculation:</p>
-            <ul>
-            <li>protocol: .</li>
-            <li>kpoints_distance: .</li>
-            <li>... .</li>
-            </ul>
-            <p>However, specifying the optima.</p></div>""")
+            """<p>Converge on [30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 90, 100, 120, 150, 200]</p>
+
+<p><a href="https://raw.githubusercontent.com/unkcpz/aiida-sssp-workflow
+/develop/aiida_sssp_workflow/workflows/protocol.yml" target="_blank">
+protocol.yml
+</a></p>""")
 
         extra = {
             'style': {
@@ -54,68 +67,17 @@ class ComputeVerificationWidget(ipw.VBox):
         }
 
         self.protocol = ipw.Dropdown(
-            options=['None', 'efficiency', 'precision'],
-            value='None',
+            options=['efficiency', 'precision'],
+            value='efficiency',
             description='Protocol:',
             disabled=False,
             **extra)
-        self.kpoints_distance = ipw.BoundedFloatText(
-            value=0.10,
-            min=0.05,
-            max=0.5,
-            step=0.05,
-            description='Kpoints distance:',
-            disabled=False,
+        self.dual= ipw.BoundedIntText(
+            value=8,
+            step=1,
+            min=1,
+            description="# dual",
             **extra)
-        self.ecutwfc = ipw.BoundedIntText(value=200,
-                                          min=10,
-                                          max=300,
-                                          step=1,
-                                          description='ecutwfc:',
-                                          disabled=False,
-                                          **extra)
-        self.ecutrho = ipw.BoundedIntText(value=800,
-                                          min=10,
-                                          max=10000,
-                                          step=1,
-                                          description='ecutrho:',
-                                          disabled=False,
-                                          **extra)
-        self.scale_count = ipw.BoundedIntText(value=7,
-                                              min=3,
-                                              max=20,
-                                              step=1,
-                                              description='EOS points:',
-                                              disabled=False,
-                                              **extra)
-        self.scale_increment = ipw.FloatText(
-            value=0.02,
-            description='EOS scale increment:',
-            disabled=False,
-            **extra)
-        self.smearing_type = ipw.Dropdown(options=[
-            'gaussian', 'methfessel-paxton', 'marzari-vanderbilt',
-            'fermi-dirac'
-        ],
-                                          value='methfessel-paxton',
-                                          description='smearing type:',
-                                          disabled=False,
-                                          **extra)
-        self.smearing = ipw.FloatText(value=0.00735,
-                                      description='smearing width:',
-                                      disabled=False,
-                                      **extra)
-
-        # update setting area upon if protocol set
-        ipw.dlink((self, 'disabled'), (self.kpoints_distance, 'disabled'))
-        ipw.dlink((self, 'disabled'), (self.ecutwfc, 'disabled'))
-        ipw.dlink((self, 'disabled'), (self.ecutrho, 'disabled'))
-        ipw.dlink((self, 'disabled'), (self.scale_count, 'disabled'))
-        ipw.dlink((self, 'disabled'), (self.scale_increment, 'disabled'))
-        ipw.dlink((self, 'disabled'), (self.smearing, 'disabled'))
-        ipw.dlink((self, 'disabled'), (self.smearing_type, 'disabled'))
-
-        self.protocol.observe(self._observe_protocol, 'value')
 
         # set the parameters for delta factor calculation
         self.parameters = ipw.HBox(children=[
@@ -123,13 +85,7 @@ class ComputeVerificationWidget(ipw.VBox):
                 children=[
                     parameters_setting_prompt,
                     self.protocol,
-                    self.kpoints_distance,
-                    self.ecutwfc,
-                    self.ecutrho,
-                    self.scale_count,
-                    self.scale_increment,
-                    self.smearing_type,
-                    self.smearing,
+                    self.dual,
                 ],
                 layout=ipw.Layout(min_width='310px'),
             ),
@@ -202,6 +158,53 @@ class ComputeVerificationWidget(ipw.VBox):
             resource_selection_help,
         ])
 
+        self.query_pp_element = ipw.Text(
+            value='Unknown',
+            placeholder='The element of the pseudo',
+            description='Element:',
+            disabled=False
+        )
+        self.query_pp_type = ipw.Text(
+            value='Unknown',
+            placeholder='The type of the pseudo',
+            description='PP type:',
+            disabled=False
+        )
+        self.query_pp_family = ipw.Text(
+            value='UnKnown',
+            placeholder='The family name of the pseudo',
+            description='Family name:',
+            disabled=False
+        )
+        self.query_pp_version = ipw.Text(
+            value='UnKnown',
+            placeholder='The version number of the pseudo',
+            description='Version:',
+            disabled=False
+        )
+
+        store_info_help = ipw.HTML(
+            """<div style="line-height:120%; padding-top:25px;">
+            <p>For easily query the information, give the specific name attributes to the calculation:</p>
+            <ul>
+            <li>Increase the number of nodes if you run out of memory for larger structures.</li>
+            <li>Increase the number of nodes and cores if you want to reduce the total runtime.</li>
+            </ul>
+            </div>"""
+        )
+        self.store_setting = ipw.HBox(children=[
+            ipw.VBox(
+                children=[
+                    self.query_pp_element,
+                    self.query_pp_type,
+                    self.query_pp_family,
+                    self.query_pp_version,
+                ],
+                layout=ipw.Layout(min_width='360px'),
+            ),
+            store_info_help,
+        ])
+
         # Clicking on the 'submit' button will trigger the execution of the
         # submit() method.
         self.submit_button = ipw.Button(
@@ -232,12 +235,13 @@ class ComputeVerificationWidget(ipw.VBox):
             children=[self.submit_button, self.skip_button])
 
         self.config_tabs = ipw.Tab(
-            children=[self.code_group, self.parameters, self.resources],
-            layout=ipw.Layout(height='320px'),
+            children=[self.code_group, self.parameters, self.resources, self.store_setting],
+            layout=ipw.Layout(height='240px'),
         )
         self.config_tabs.set_title(0, 'Code')
-        self.config_tabs.set_title(1, 'Parameters')
+        self.config_tabs.set_title(1, 'Protocol')
         self.config_tabs.set_title(2, 'Compute resources')
+        self.config_tabs.set_title(3, 'Query info setting')
 
         description = ipw.Label(
             'Specify the parameters and options for the calculation and then click on "Submit".'
@@ -245,6 +249,22 @@ class ComputeVerificationWidget(ipw.VBox):
 
         super().__init__(
             children=[description, self.config_tabs, self.buttons], **kwargs)
+
+    @traitlets.observe('input_pseudo')
+    def _observe_input_pseudo(self, change):
+        if change['new']:
+            upf_content = change['new'].get_content()
+            element = parse_element(upf_content)
+            pp_type = parse_pp_type(upf_content)
+
+            self.query_pp_element.value = element
+            self.query_pp_type.value = pp_type
+
+            # set dual upon pp type
+            if pp_type == 'NC':
+                self.dual.value = 4
+            else:
+                self.dual.value = 8
 
     def _update_total_num_cpus(self, _):
         self.total_num_cpus.value = self.number_of_nodes.value * self.cpus_per_node.value
@@ -258,31 +278,19 @@ class ComputeVerificationWidget(ipw.VBox):
             print('Please set input pseudopotential in previous step.')
         else:
             builder = WorkflowFactory(
-                'sssp_workflow.delta_factor').get_builder()
+                'sssp_workflow.verification').get_builder()
 
             builder.pseudo = self.input_pseudo
-            builder.code = self.code_group.selected_code
+            builder.pw_code = self.code_group.children[0].selected_code
+            builder.ph_code = self.code_group.children[1].selected_code
 
-            if self.protocol.value != 'None':
-                builder.protocol = orm.Str(self.protocol.value)
-            else:
-                parameters = {
-                    'SYSTEM': {
-                        'occupations': 'smearing',
-                        'degauss': self.smearing.value,
-                        'smearing': self.smearing_type.value,
-                    },
-                }
-                builder.parameters.pw = orm.Dict(dict=parameters)
-                builder.parameters.ecutwfc = orm.Int(self.ecutwfc.value)
-                builder.parameters.ecutrho = orm.Int(self.ecutrho.value)
+            builder.protocol = orm.Str(self.protocol.value)
 
-                builder.parameters.kpoints_distance = orm.Float(
-                    self.kpoints_distance.value)
-                builder.parameters.scale_count = orm.Int(
-                    self.scale_count.value)
-                builder.parameters.scale_increment = orm.Float(
-                    self.scale_increment.value)
+            ecutwfc = np.array(
+                [30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 90, 100, 120, 150, 200])
+            ecutrho = ecutwfc * self.dual.value
+            builder.parameters.ecutwfc_list = orm.List(list=list(ecutwfc))
+            builder.parameters.ecutrho_list = orm.List(list=list(ecutrho))
 
             builder.options = orm.Dict(dict=self.options)
             builder.clean_workdir = orm.Bool(True)
@@ -292,11 +300,15 @@ class ComputeVerificationWidget(ipw.VBox):
             # print(builder)
             self.process = submit(builder)
 
-    def _observe_protocol(self, change):
-        if change['new'] != 'None':
-            self.disabled = True
-        else:
-            self.disabled = False
+            # set extras for easy query and comprehensive show results
+            extras = {
+                'element': self.query_pp_element.value,
+                'pp_type': self.query_pp_type.value,
+                'pp_family': self.query_pp_family.value,
+                'pp_version': self.query_pp_version.value,
+                'pp_filename': self.input_pseudo.filename,
+            }
+            self.process.set_extra_many(extras)
 
     @property
     def options(self):
@@ -307,3 +319,38 @@ class ComputeVerificationWidget(ipw.VBox):
                 'num_mpiprocs_per_machine': self.cpus_per_node.value
             }
         }
+
+
+REGEX_ELEMENT_V1 = re.compile(r"""(?P<element>[a-zA-Z]{1,2})\s+Element""")
+REGEX_ELEMENT_V2 = re.compile(r"""\s*element\s*=\s*['"]\s*(?P<element>[a-zA-Z]{1,2})\s*['"].*""")
+
+REGEX_PP_TYPE_V1 = re.compile(r"""(?P<pp_type>[a-zA-Z]{1,2})\s+Ultrasoft pseudopotential""")
+REGEX_PP_TYPE_V2 = re.compile(r"""\s*pseudo_type\s*=\s*['"]\s*(?P<pp_type>[a-zA-Z]{1,2})\s*['"].*""")
+
+def parse_element(content: str):
+    """Parse the content of the UPF file to determine the element.
+    :param stream: a filelike object with the binary content of the file.
+    :return: the symbol of the element following the IUPAC naming standard.
+    """
+    for regex in [REGEX_ELEMENT_V2, REGEX_ELEMENT_V1]:
+
+        match = regex.search(content)
+
+        if match:
+            return match.group('element')
+
+    raise ValueError(f'could not parse the element from the UPF content: {content}')
+
+def parse_pp_type(content: str):
+    """Parse the content of the UPF file to determine the element.
+    :param stream: a filelike object with the binary content of the file.
+    :return: the symbol of the element following the IUPAC naming standard.
+    """
+    for regex in [REGEX_PP_TYPE_V2, REGEX_PP_TYPE_V1]:
+
+        match = regex.search(content)
+
+        if match:
+            return match.group('pp_type')
+
+    raise ValueError(f'could not parse the pp_type from the UPF content: {content}')
