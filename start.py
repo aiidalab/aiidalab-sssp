@@ -5,13 +5,14 @@ import ipywidgets as ipw
 template = """
 <table>
 <tr>
-  <th style="text-align:center">Application sssp workflow</th>
-<tr>
   <td valign="top"><ul>
-    <li><a href="{appbase}/sssp-delta-factor.ipynb" target="_blank">delta-factor workflow</a></li>
-    <li><a href="{appbase}/sssp-verification.ipynb" target="_blank">verification workflow</a></li>
-    <li><a href="{appbase}/check-verification-results.ipynb" target="_blank"> check verification process</a></li>
-    <li><a href="{appbase}/bands-chessboard.ipynb" target="_blank">bands chessboard</a></li>
+    <a href="{appbase}/qe.ipynb" target="_blank">
+        <img src="https://raw.githubusercontent.com/aiidalab/aiidalab-sssp/main/miscellaneous/logo-sssp.png" height="120px" width=243px">
+    </a>
+  </ul></td>
+  <td valign="top"><ul>
+    <li><a href="{appbase}/verification.ipynb" target="_blank">Running SSSP Verification </a></li>
+    <li><a href="{appbase}/inspect.ipynb" target="_blank"> Inspect and Compare Verification Results </a></li>
   </ul></td>
 </tr>
 </table>
