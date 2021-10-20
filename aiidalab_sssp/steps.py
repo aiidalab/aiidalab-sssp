@@ -316,8 +316,7 @@ class SubmitVerificationStep(ipw.VBox, WizardAppWidgetStep):
         pw_code = CodeDropdown(input_plugin='quantumespresso.pw',
                                description="PW code")
         self.ph_code = CodeDropdown(input_plugin='quantumespresso.ph',
-                               description="PH code",
-                               layout={"visibility": "hidden"})
+                               description="PH code")
 
         self.code_group = ipw.VBox(children=[pw_code, self.ph_code])
 
@@ -325,10 +324,10 @@ class SubmitVerificationStep(ipw.VBox, WizardAppWidgetStep):
         properties_list = ['Delta factor', 'Convergence: Cohesive Energy',
             'Convergence: Bands Distance', 'Convergence: Pressure']
 
-        phonon_checkbox = ipw.Checkbox(value=False, description='Convergence: Phonon Frequencies')
+        phonon_checkbox = ipw.Checkbox(value=True, description='Convergence: Phonon Frequencies')
         phonon_checkbox.observe(self.on_phonon_checkbox_change, names="value")
 
-        self.properties = [ipw.Checkbox(value=False, description=label) for label in properties_list] + [phonon_checkbox]
+        self.properties = [ipw.Checkbox(value=True, description=label) for label in properties_list] + [phonon_checkbox]
 
         option_box_extra = {
             'style': {
@@ -341,7 +340,7 @@ class SubmitVerificationStep(ipw.VBox, WizardAppWidgetStep):
 
         self.protocol = ipw.Dropdown(
             options=protocol_list,
-            value='efficiency',
+            value='test',
             description='Protocol:',
             disabled=False,
             **option_box_extra)
@@ -518,23 +517,24 @@ class SubmitVerificationStep(ipw.VBox, WizardAppWidgetStep):
 
     def verify(self):
         """Run the workflow to calculate delta factor"""
-        DeltaFactorWorkChain = WorkflowFactory('sssp_workflow.delta_factor')
+        VerificationWorkChain = WorkflowFactory('sssp_workflow.verification')
 
         if self.input_pseudo is None:
             print('Please set input pseudopotential in previous step.')
         else:
             from aiida.engine import submit
 
-            builder = DeltaFactorWorkChain.get_builder()
+            builder = VerificationWorkChain.get_builder()
 
             builder.pseudo = self.input_pseudo
-            builder.code = self.code_group.children[0].selected_code
-            # builder.ph_code = self.code_group.children[1].selected_code
+            builder.pw_code = self.code_group.children[0].selected_code
+            builder.ph_code = self.code_group.children[1].selected_code
 
             builder.protocol = orm.Str(self.protocol.value)
-            # builder.dual = orm.Float(self.dual.value)
+            builder.dual = orm.Float(self.dual.value)
 
             builder.options = orm.Dict(dict=self.options)
+            builder.parallelization = orm.Dict(dict={})
             builder.clean_workdir = orm.Bool(True)
 
             self.verify_button.disabled = True
