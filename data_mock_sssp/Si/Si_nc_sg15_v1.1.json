@@ -1,0 +1,167 @@
+{
+  "convergence_cohesive_energy": {
+    "output_parameters": {
+      "ecutrho": [
+        240.0,
+        280.0,
+        320.0,
+        480.0
+      ],
+      "ecutwfc": [
+        30.0,
+        35.0,
+        40.0,
+        60.0
+      ],
+      "absolute_diff": [
+        0.0078083745099997,
+        0.0045300150599994,
+        0.0022534426899998,
+        0.0
+      ],
+      "absolute_unit": "eV/atom",
+      "relative_diff": [
+        0.14721592461468,
+        0.085407065801233,
+        0.042485494099914,
+        0.0
+      ],
+      "relative_unit": "%",
+      "cohesive_energy_per_atom": [
+        -5.2962200656451,
+        -5.2994984250951,
+        -5.3017749974651,
+        -5.3040284401551
+      ]
+    }
+  },
+  "convergence_phonon_frequencies": {
+    "output_parameters": {
+      "ecutrho": [
+        240.0,
+        280.0,
+        320.0,
+        480.0
+      ],
+      "ecutwfc": [
+        30.0,
+        35.0,
+        40.0,
+        60.0
+      ],
+      "absolute_diff": [
+        0.42416516666667,
+        -0.0053066666666789,
+        0.28304833333333,
+        0.0
+      ],
+      "absolute_unit": "cm-1",
+      "relative_diff": [
+        0.20618819816298,
+        0.17671386504346,
+        0.12922055770592,
+        0.0
+      ],
+      "relative_unit": "%",
+      "absolute_max_diff": [
+        0.816507,
+        0.22087699999997,
+        0.49532999999997,
+        0.0
+      ],
+      "relative_max_diff": [
+        0.31799049306482,
+        0.052727130051315,
+        0.19213603424356,
+        0.0
+      ]
+    }
+  },
+  "convergence_pressure": {
+    "output_parameters": {
+      "ecutrho": [
+        240.0,
+        280.0,
+        320.0,
+        480.0
+      ],
+      "ecutwfc": [
+        30.0,
+        35.0,
+        40.0,
+        60.0
+      ],
+      "pressure": [
+        0.97893509947575,
+        0.96736283522628,
+        0.96996169118061,
+        0.99413595505767
+      ],
+      "absolute_diff": [
+        0.01520085558192,
+        0.02677311983139,
+        0.02417426387706,
+        0.0
+      ],
+      "absolute_unit": "GPascal",
+      "relative_diff": [
+        0.017274247241473,
+        0.030414518065302,
+        0.027464310607304,
+        0.0
+      ],
+      "relative_unit": "%"
+    }
+  },
+  "delta_factor": {
+    "output_birch_murnaghan_fit": {
+      "energy0": -107.1363661,
+      "volume0": 20.7722917,
+      "residuals0": 0,
+      "bulk_deriv0": 2.3778223,
+      "volume0_unit": "A^3/atom",
+      "bulk_modulus0": 90.0661998,
+      "bulk_modulus0_unit": "GPa"
+    },
+    "output_delta_factor": {
+      "delta": 5.928629517208,
+      "delta1": 9.6619132289389,
+      "delta_unit": "meV/atom",
+      "delta_relative": 62.361416874649,
+      "delta_relative_unit": "%",
+      "birch_murnaghan_results": [
+        20.7722917,
+        90.0661998,
+        2.3778223
+      ],
+      "reference_wien2k_V0_B0_B1": [
+        20.453,
+        88.545,
+        4.31
+      ]
+    },
+    "output_volume_energy": {
+      "volumes": {
+        "0": 19.62813690628,
+        "1": 20.037056425039,
+        "2": 20.445975943997,
+        "3": 20.854895463121,
+        "4": 21.263814981986
+      },
+      "energies": {
+        "0": -107.11742659617,
+        "1": -107.1290993953,
+        "2": -107.13435207667,
+        "3": -107.13665769719,
+        "4": -107.13308198535
+      },
+      "energy_unit": "eV/atom",
+      "volume_unit": "A^3/atom"
+    }
+  },
+  "pseudo_info": {
+    "element": "Si",
+    "pp_type": "NC",
+    "z_valence": 4
+  }
+}
