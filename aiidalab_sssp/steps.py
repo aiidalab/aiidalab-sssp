@@ -321,13 +321,27 @@ class SubmitVerificationStep(ipw.VBox, WizardAppWidgetStep):
         self.code_group = ipw.VBox(children=[pw_code, self.ph_code])
 
         protocol_list = ['efficiency', 'precision', 'test'] # will read from sssp plugin
-        properties_list = ['Delta factor', 'Convergence: Cohesive Energy',
-            'Convergence: Bands Distance', 'Convergence: Pressure']
+
+        # properties checkbox setting      
+
+        # aiida_sssp_workflow.workflows.verifications::DEFAULT_PROPERTIES_LIST  
+        self.properties_list = [
+            'delta_factor', 
+            'convergence:cohesive_energy', 
+            'convergence:phonon_frequencies',
+            'convergence:pressure']
+
+        delta_factor_checkbox = ipw.Checkbox(value=True, description='Delta Factor')
+        delta_factor_checkbox.observe(self._on_delta_factor_checkbox_change, names="value")
+
+        cohesive_energy_checkbox = ipw.Checkbox(value=True, description='Convergence: Cohesive energy')
+        cohesive_energy_checkbox.observe(self._on_cohesive_energy_checkbox_change, names="value")
 
         phonon_checkbox = ipw.Checkbox(value=True, description='Convergence: Phonon Frequencies')
-        phonon_checkbox.observe(self.on_phonon_checkbox_change, names="value")
+        phonon_checkbox.observe(self._on_phonon_frequencies_checkbox_change, names="value")
 
-        self.properties = [ipw.Checkbox(value=True, description=label) for label in properties_list] + [phonon_checkbox]
+        pressure_checkbox = ipw.Checkbox(value=True, description='Convergence: Pressure')
+        pressure_checkbox.observe(self._on_pressure_checkbox_change, names="value")
 
         option_box_extra = {
             'style': {
@@ -340,7 +354,7 @@ class SubmitVerificationStep(ipw.VBox, WizardAppWidgetStep):
 
         self.protocol = ipw.Dropdown(
             options=protocol_list,
-            value='test',
+            value='efficiency',
             description='Protocol:',
             disabled=False,
             **option_box_extra)
@@ -353,25 +367,25 @@ class SubmitVerificationStep(ipw.VBox, WizardAppWidgetStep):
             **option_box_extra)
 
         self.query_pp_element = ipw.Text(
-            value='Unknown',
+            value='Undetected',
             placeholder='The element of the pseudo',
             description='Element:',
-            disabled=False
+            disabled=True
         )
         self.query_pp_type = ipw.Text(
-            value='Unknown',
+            value='Undetected',
             placeholder='The type of the pseudo',
             description='PP type:',
-            disabled=False
+            disabled=True
         )
         self.query_pp_family = ipw.Text(
-            value='UnKnown',
+            value='Unset',
             placeholder='The family name of the pseudo',
             description='Family name:',
             disabled=False
         )
         self.query_pp_version = ipw.Text(
-            value='UnKnown',
+            value='Unset',
             placeholder='The version number of the pseudo',
             description='Version:',
             disabled=False
@@ -380,7 +394,11 @@ class SubmitVerificationStep(ipw.VBox, WizardAppWidgetStep):
         # the settings for protocol choose (dropdown) and properties (checkboxes) and infos for query
         self.settings = ipw.HBox(children=[
             ipw.VBox(
-                children=self.properties,
+                children=[
+                    delta_factor_checkbox, 
+                    cohesive_energy_checkbox, 
+                    phonon_checkbox, 
+                    pressure_checkbox],
             ),
             ipw.VBox(
                 children=[
@@ -486,12 +504,35 @@ class SubmitVerificationStep(ipw.VBox, WizardAppWidgetStep):
         super().__init__(
             children=[description, self.config_tabs, self.buttons], **kwargs)
 
-    def on_phonon_checkbox_change(self, change):
+    def _on_delta_factor_checkbox_change(self, change):
+        """If cohesive checkbox is clicked."""
+        if change['new']:
+            self.properties_list.append('delta_factor')
+        else:
+            self.properties_list.remove('delta_factor')
+
+    def _on_cohesive_energy_checkbox_change(self, change):
+        """If cohesive checkbox is clicked."""
+        if change['new']:
+            self.properties_list.append('convergence:cohesive_energy')
+        else:
+            self.properties_list.remove('convergence:cohesive_energy')
+
+    def _on_phonon_frequencies_checkbox_change(self, change):
         """If phonon checkbox is clicked."""
         if change['new']:
             self.ph_code.layout.visibility = "visible"
+            self.properties_list.append('convergence:phonon_frequencies')
         else:
             self.ph_code.layout.visibility = "hidden"
+            self.properties_list.remove('convergence:phonon_frequencies')
+
+    def _on_pressure_checkbox_change(self, change):
+        """If pressure checkbox is clicked."""
+        if change['new']:
+            self.properties_list.append('convergence:pressure')
+        else:
+            self.properties_list.remove('convergence:pressure')
 
     @traitlets.observe('input_pseudo')
     def _observe_input_pseudo(self, change):
@@ -532,6 +573,7 @@ class SubmitVerificationStep(ipw.VBox, WizardAppWidgetStep):
 
             builder.protocol = orm.Str(self.protocol.value)
             builder.dual = orm.Float(self.dual.value)
+            builder.properties_list = orm.List(list=self.properties_list)
 
             builder.options = orm.Dict(dict=self.options)
             builder.parallelization = orm.Dict(dict={})
@@ -551,6 +593,29 @@ class SubmitVerificationStep(ipw.VBox, WizardAppWidgetStep):
                 'pp_filename': self.input_pseudo.filename,
             }
             self.process.set_extra_many(extras)
+
+    @traitlets.observe('process')
+    def _observe_process(self, change):
+        with self.hold_trait_notifications():
+            process_node = change['new']
+            if process_node is not None:
+                self.input_pseudo = process_node.inputs.pseudo
+                # TODO: I can do builder parameters setting here
+            self._update_state()
+
+    def _get_state(self):
+        # Process is already running.
+        if self.process is not None:
+            return self.State.SUCCESS
+
+        # Input structure not specified.
+        if self.input_pseudo is None:
+            return self.State.INIT
+        else:
+            return self.state.CONFIGURED
+
+    def _update_state(self, _=None):
+        self.state = self._get_state() 
 
     @property
     def options(self):
