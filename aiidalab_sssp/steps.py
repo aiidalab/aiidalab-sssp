@@ -22,6 +22,7 @@ from aiidalab_widgets_base import (
 )
 
 UpfData = DataFactory('pseudo.upf')
+VerificationWorkChain = WorkflowFactory('sssp_workflow.verification')
 
 class PseudoInputStep(ipw.VBox, WizardAppWidgetStep):
     """
@@ -310,15 +311,20 @@ class SubmitVerificationStep(ipw.VBox, WizardAppWidgetStep):
     process = traitlets.Instance(ProcessNode, allow_none=True)
     input_pseudo = traitlets.Instance(UpfData, allow_none=True)
 
+    _submission_blockers = traitlets.List(traitlets.Unicode)
+
     skip = False
 
     def __init__(self, **kwargs):
-        pw_code = CodeDropdown(input_plugin='quantumespresso.pw',
+        self.pw_code = CodeDropdown(input_plugin='quantumespresso.pw',
                                description="PW code")
         self.ph_code = CodeDropdown(input_plugin='quantumespresso.ph',
                                description="PH code")
 
-        self.code_group = ipw.VBox(children=[pw_code, self.ph_code])
+        self.pw_code.observe(self._update_state, "selected_code")
+        self.ph_code.observe(self._update_state, "selected_code")
+
+        self.code_group = ipw.VBox(children=[self.pw_code, self.ph_code])
 
         protocol_list = ['efficiency', 'precision', 'test'] # will read from sssp plugin
 
@@ -331,39 +337,39 @@ class SubmitVerificationStep(ipw.VBox, WizardAppWidgetStep):
             'convergence:phonon_frequencies',
             'convergence:pressure']
 
-        delta_factor_checkbox = ipw.Checkbox(value=True, description='Delta Factor')
+        option_checkbox_extra = {
+            'style': {
+                'description_width': 'initial'
+            },
+        }
+
+        delta_factor_checkbox = ipw.Checkbox(value=True, description='Delta Factor (the difference of EOS to wien2K)', **option_checkbox_extra)
         delta_factor_checkbox.observe(self._on_delta_factor_checkbox_change, names="value")
 
-        cohesive_energy_checkbox = ipw.Checkbox(value=True, description='Convergence: Cohesive energy')
+        cohesive_energy_checkbox = ipw.Checkbox(value=True, description='Convergence: Cohesive energy', **option_checkbox_extra)
         cohesive_energy_checkbox.observe(self._on_cohesive_energy_checkbox_change, names="value")
 
-        phonon_checkbox = ipw.Checkbox(value=True, description='Convergence: Phonon Frequencies')
+        phonon_checkbox = ipw.Checkbox(value=True, description='Convergence: Phonon Frequencies', **option_checkbox_extra)
         phonon_checkbox.observe(self._on_phonon_frequencies_checkbox_change, names="value")
 
-        pressure_checkbox = ipw.Checkbox(value=True, description='Convergence: Pressure')
+        pressure_checkbox = ipw.Checkbox(value=True, description='Convergence: Pressure', **option_checkbox_extra)
         pressure_checkbox.observe(self._on_pressure_checkbox_change, names="value")
 
         option_box_extra = {
             'style': {
-                'description_width': '120px'
+                'description_width': 'initial'
             },
-            'layout': {
-                'max_width': '210px'
-            }
         }
 
-        self.protocol = ipw.Dropdown(
+        self.protocol = ipw.ToggleButtons(
             options=protocol_list,
-            value='efficiency',
-            description='Protocol:',
-            disabled=False,
-            **option_box_extra)
+            value='efficiency')
 
         self.dual= ipw.BoundedIntText(
             value=8,
             step=1,
             min=1,
-            description="# dual",
+            description="# dual (ecutrho/ecutwfc)",
             **option_box_extra)
 
         self.query_pp_element = ipw.Text(
@@ -390,30 +396,83 @@ class SubmitVerificationStep(ipw.VBox, WizardAppWidgetStep):
             description='Version:',
             disabled=False
         )
-
+        self.extra_label = ipw.Text(
+            value='Unset',
+            placeholder='The label of the pseudo',
+            description='Label:',
+            disabled=False
+        )
+        self.extra_description = ipw.Text(
+            value='Unset',
+            placeholder='The description of the pseudo',
+            description='Description:',
+            disabled=False
+        )
         # the settings for protocol choose (dropdown) and properties (checkboxes) and infos for query
-        self.settings = ipw.HBox(children=[
+
+        propertis_prompt = ipw.HTML(
+            """
+            <p>Choose the properties you want to verify for the pseudopotential.</p>
+            <p>All the calculations are performed on the ground-state structures of
+            elemental crystals at 0K. </p>
+            <p>For the detailed logic of how cohesive energy, phonon frequencies and pressure properties are
+            evaluated, please check .. for reference.</p>
+            """
+        )
+        protocol_prompt = ipw.HTML(
+            "The protocol predefine calculation parameters for the calculation."
+        )
+        dual_prompt = ipw.HTML(
+            "The dual will influence the ecutrho for each ecutwfc setting in convergence verification."
+        )
+
+        properties_setting = ipw.VBox(
+            children=[
+                propertis_prompt,
+                delta_factor_checkbox, 
+                cohesive_energy_checkbox, 
+                phonon_checkbox, 
+                pressure_checkbox,
+            ],
+        )
+        self.settings = ipw.VBox(
+            children=[
+                protocol_prompt,
+                self.protocol,
+                dual_prompt,
+                self.dual,
+                properties_setting,
+            ]
+        )
+
+        # setting the extra metadata for the future query and description display of the pseudo
+
+        extra_metadata_prompt = ipw.HTML(
+            "Set metadata for the pseudopotential verification process.")
+        extra_metadata_help = ipw.HTML("""<div style="line-height:120%; padding-top:25px;">
+            <p>There is no general rule of thumb on how to name the extra metadata. In general:</p>
+            <ul>
+            <li>Element and PP type are read from the uploaded pseudopotential file and not setable.</li>
+            <li>Family name indicate the library of the pseudopotential, such as sg15, gbrv etc.</li>
+            <li>Family Version is the version of pseudopotential in this pp family.</li>
+            <li>Label is the abbrevation to represent the pseudopotential in DB and in inspect step.</li>
+            <li>Description is the description and comment info for the pseudopotential and for this verification process.</li>
+            </ul>
+            <p>However, it is not apparent to set every options.</p></div>""")
+
+        self.set_extra_metadata = ipw.HBox(children=[
             ipw.VBox(
                 children=[
-                    delta_factor_checkbox, 
-                    cohesive_energy_checkbox, 
-                    phonon_checkbox, 
-                    pressure_checkbox],
-            ),
-            ipw.VBox(
-                children=[
-                    self.protocol,
-                    self.dual,
-                ],
-            ),
-            ipw.VBox(
-                children=[
+                    extra_metadata_prompt,
                     self.query_pp_element,
                     self.query_pp_type,
                     self.query_pp_family,
                     self.query_pp_version,
+                    self.extra_label,
+                    self.extra_description,
                 ],
             ),
+            extra_metadata_help,
         ])
 
         self.number_of_nodes = ipw.BoundedIntText(
@@ -490,19 +549,52 @@ class SubmitVerificationStep(ipw.VBox, WizardAppWidgetStep):
             children=[self.verify_button, self.skip_button])
 
         self.config_tabs = ipw.Tab(
-            children=[self.settings, self.code_group, self.resources],
-            layout=ipw.Layout(height='240px'),
+            children=[self.settings, self.code_group, self.resources, self.set_extra_metadata],
+            layout=ipw.Layout(min_height='250px'),
         )
         self.config_tabs.set_title(0, 'Verification Setting')
         self.config_tabs.set_title(1, 'Codes Setting')
         self.config_tabs.set_title(2, 'Compute Resources Setting')
+        self.config_tabs.set_title(3, 'Extra Metadata')
+
+        # this is for display the information read from the pseudopotential file, element and pp_type etc.
+        self.basic_pseudo_info = ipw.Label('')
+        self.basic_pseudo_info.layout.visibility = "hidden"
 
         description = ipw.Label(
             'Specify the parameters and options for the calculation and then click on "Verify".'
         )
 
+        self._submission_blocker_messages = ipw.HTML()
+
         super().__init__(
-            children=[description, self.config_tabs, self.buttons], **kwargs)
+            children=[
+                self.basic_pseudo_info, 
+                description, 
+                self.config_tabs,
+                self._submission_blocker_messages, 
+                self.buttons,
+            ], **kwargs)
+
+    @traitlets.observe("state")
+    def _observe_state(self, change):
+        with self.hold_trait_notifications():
+            self.disabled = change["new"] not in (
+                self.State.READY,
+                self.State.CONFIGURED,
+            )
+            self.verify_button.disabled = change["new"] != self.State.CONFIGURED
+
+    @traitlets.observe("_submission_blockers")
+    def _observe_submission_blockers(self, change):
+        if change["new"]:
+            fmt_list = "\n".join((f"<li>{item}</li>" for item in sorted(change["new"])))
+            self._submission_blocker_messages.value = f"""
+                <div class="alert alert-info">
+                <strong>The submission is blocked, due to the following reason(s):</strong>
+                <ul>{fmt_list}</ul></div>"""
+        else:
+            self._submission_blocker_messages.value = ""
 
     def _on_delta_factor_checkbox_change(self, change):
         """If cohesive checkbox is clicked."""
@@ -534,8 +626,60 @@ class SubmitVerificationStep(ipw.VBox, WizardAppWidgetStep):
         else:
             self.properties_list.remove('convergence:pressure')
 
-    @traitlets.observe('input_pseudo')
+    def _update_total_num_cpus(self, _):
+        self.total_num_cpus.value = self.number_of_nodes.value * self.cpus_per_node.value
+
+    def _on_verify_button_clicked(self, _):
+        self.verify_button.disabled = True
+        self.verify()
+
+    def verify(self):
+        """Run the workflow to calculate delta factor"""
+        builder = VerificationWorkChain.get_builder()
+
+        builder.pseudo = self.input_pseudo
+        builder.pw_code = self.pw_code.selected_code
+        builder.ph_code = self.ph_code.selected_code
+
+        builder.protocol = orm.Str(self.protocol.value)
+        builder.dual = orm.Float(self.dual.value)
+        builder.properties_list = orm.List(list=self.properties_list)
+
+        builder.options = orm.Dict(dict=self.options)
+        builder.parallelization = orm.Dict(dict={})
+        builder.clean_workdir = orm.Bool(True)
+
+        self.process = submit(builder)
+
+        # set extras for easy query and comprehensive show results
+        extras = {
+            'element': self.query_pp_element.value,
+            'pp_type': self.query_pp_type.value,
+            'pp_family': self.query_pp_family.value,
+            'pp_version': self.query_pp_version.value,
+            'pp_filename': self.input_pseudo.filename,
+            'pp_label': self.extra_label.value,
+            }
+        self.process.set_extra_many(extras)
+
+        self.process.description = self.extra_description
+
+    @traitlets.observe('process')
+    def _observe_process(self, change):
+        with self.hold_trait_notifications():
+            process_node = change['new']
+            if process_node is not None:
+                self.input_pseudo = process_node.inputs.pseudo
+                # TODO: I can do builder parameters setting here
+            self._update_state()
+
+    @traitlets.observe("input_pseudo")
     def _observe_input_pseudo(self, change):
+        # self.set_input_parameters(DEFAULT_PARAMETERS)
+        self._update_state()
+        # self._set_num_mpi_tasks_to_default()
+
+        # update extra and description
         if change['new']:
             pseudo = change['new']
             upf_header = helper_parse_upf(pseudo)
@@ -550,58 +694,10 @@ class SubmitVerificationStep(ipw.VBox, WizardAppWidgetStep):
             else:
                 self.dual.value = 8
 
-    def _update_total_num_cpus(self, _):
-        self.total_num_cpus.value = self.number_of_nodes.value * self.cpus_per_node.value
+            # display description on step 2
+            self.basic_pseudo_info.layout.visibility = 'visible'
+            self.basic_pseudo_info.value = f'The pseudopotential you uploaded: element={pseudo.element}, pp_type={pp_type}'
 
-    def _on_verify_button_clicked(self, _):
-        self.verify()
-
-    def verify(self):
-        """Run the workflow to calculate delta factor"""
-        VerificationWorkChain = WorkflowFactory('sssp_workflow.verification')
-
-        if self.input_pseudo is None:
-            print('Please set input pseudopotential in previous step.')
-        else:
-            from aiida.engine import submit
-
-            builder = VerificationWorkChain.get_builder()
-
-            builder.pseudo = self.input_pseudo
-            builder.pw_code = self.code_group.children[0].selected_code
-            builder.ph_code = self.code_group.children[1].selected_code
-
-            builder.protocol = orm.Str(self.protocol.value)
-            builder.dual = orm.Float(self.dual.value)
-            builder.properties_list = orm.List(list=self.properties_list)
-
-            builder.options = orm.Dict(dict=self.options)
-            builder.parallelization = orm.Dict(dict={})
-            builder.clean_workdir = orm.Bool(True)
-
-            self.verify_button.disabled = True
-
-            # print(builder)
-            self.process = submit(builder)
-
-            # set extras for easy query and comprehensive show results
-            extras = {
-                'element': self.query_pp_element.value,
-                'pp_type': self.query_pp_type.value,
-                'pp_family': self.query_pp_family.value,
-                'pp_version': self.query_pp_version.value,
-                'pp_filename': self.input_pseudo.filename,
-            }
-            self.process.set_extra_many(extras)
-
-    @traitlets.observe('process')
-    def _observe_process(self, change):
-        with self.hold_trait_notifications():
-            process_node = change['new']
-            if process_node is not None:
-                self.input_pseudo = process_node.inputs.pseudo
-                # TODO: I can do builder parameters setting here
-            self._update_state()
 
     def _get_state(self):
         # Process is already running.
@@ -610,12 +706,43 @@ class SubmitVerificationStep(ipw.VBox, WizardAppWidgetStep):
 
         # Input structure not specified.
         if self.input_pseudo is None:
+            self._submission_blockers = ["No pseudo selected."]
+            # This blocker is handled differently than the other blockers,
+            # because it is displayed as INIT state.
             return self.State.INIT
+
+        blockers = list(self._identify_submission_blockers())
+        if any(blockers):
+            self._submission_blockers = blockers
+            return self.State.READY
         else:
+            self._submission_blockers = []
             return self.state.CONFIGURED
 
     def _update_state(self, _=None):
         self.state = self._get_state() 
+
+    def _identify_submission_blockers(self):
+        # No input pseudo specified.
+        if self.input_pseudo is None:
+            yield "No pseudo selected."
+
+        # No code selected (this is ignored while the setup process is running).
+        if (
+            self.code_group.children[0].selected_code is None
+        ):
+            yield (
+                'No pw.x code selected. Go to "Codes & '
+                'Resources" to select a pw code.'
+            )
+
+        if (
+            self.code_group.children[1].selected_code is None
+        ):
+            yield (
+                'No ph.x code selected. Go to "Codes & '
+                'Resources" to select a ph code.'
+            )
 
     @property
     def options(self):
@@ -626,3 +753,121 @@ class SubmitVerificationStep(ipw.VBox, WizardAppWidgetStep):
                 'num_mpiprocs_per_machine': self.cpus_per_node.value
             }
         }
+
+def parse_state_to_info(process_state, exit_status=None) -> str:
+    if process_state == 'finished':
+        if exit_status == 0:
+            return 'FINISH OKAY <span>&#10003;</span>'
+        else:
+            return f'FINISH FAILED[{exit_status}] <span>&#10060;</span>'
+
+    if process_state == 'waiting':
+        return 'RUNNING <span>&#9900;</span>'
+
+    return 'NOT RUNNING <span>&#9888;</span>'
+
+class ShowVerificationStatus(ipw.VBox):
+
+    process = traitlets.Instance(ProcessNode, allow_none=True)
+
+    def __init__(self, **kwargs):
+        init_info = parse_state_to_info(None)
+
+        self.delta_factor_state = ipw.HTML(init_info)
+        self.pressure_state = ipw.HTML(init_info)
+        self.cohesive_energy_state = ipw.HTML(init_info)
+        self.phonon_frequencies_state = ipw.HTML(init_info)
+        self.bands_distance_state = ipw.HTML(init_info)
+
+        status_delta_factor = ipw.HBox(
+            children=[
+                ipw.HTML('Delta factor:'),
+                self.delta_factor_state,
+            ]
+        )
+        status_conv_pressure = ipw.HBox(
+            children=[
+                ipw.HTML('Convergence: Pressure status:'),
+                self.pressure_state,
+            ]
+        )
+        status_conv_cohesive_energy= ipw.HBox(
+            children=[
+                ipw.HTML('Convergence - Cohesive energy:'),
+                self.cohesive_energy_state,
+            ]
+        )
+        status_conv_phonon = ipw.HBox(
+            children=[
+                ipw.HTML('Convergence - Phonon frequencies:'),
+                self.phonon_frequencies_state,
+            ]
+        )
+        status_conv_bands = ipw.HBox(
+            children=[
+                ipw.HTML('Convergence - Bands distance:'),
+                self.bands_distance_state,
+            ]
+        )
+        refresh_button = ipw.Button(
+            description='Refresh',
+            tooltip='Refresh the verification status',
+        )
+        refresh_button.on_click(self._on_refresh_button_clicked)
+
+        super().__init__(
+            children=[
+                status_delta_factor,
+                status_conv_cohesive_energy,
+                status_conv_pressure,
+                status_conv_phonon,
+                status_conv_bands,
+                refresh_button,
+            ],
+            **kwargs,
+        )
+
+    def _get_verification_info(self, process):
+        """
+        Go through the called workflow state and set the infos.
+        """
+        res = {}
+
+        for sub in process.called:
+            label = sub.attributes.get('process_label')
+            process_state = sub.attributes.get('process_state')
+            exit_status = sub.attributes.get('exit_status', None)
+
+            info = parse_state_to_info(process_state, exit_status)
+
+            if  label == 'DeltaFactorWorkChain':
+                res['delta_factor'] = info
+
+            if label == 'ConvergencePressureWorkChain':
+                res['convergence:pressure'] = info
+
+            if label == 'ConvergenceCohesiveEnergyWorkChain':
+                res['convergence:cohesive_energy'] = info
+
+            if label == 'ConvergencePhononFrequenciesWorkChain':
+                res['convergence:bands_distance'] = info
+
+        return res
+
+    def _update_state(self):
+        if self.process is not None:
+            infos = self._get_verification_info(self.process)
+            not_running_text = parse_state_to_info(None)
+
+            self.delta_factor_state.value = infos.get('delta_factor', not_running_text)
+            self.pressure_state.value = infos.get('convergence:pressure', not_running_text)
+            self.cohesive_energy_state.value = infos.get('convergence:cohesive_energy', not_running_text)
+            self.phonon_frequencies_state.value = infos.get('convergence:phonon_frequencies', not_running_text)
+            self.bands_distance_state.value = infos.get('convergence:bands_distance', not_running_text)
+
+    def _on_refresh_button_clicked(self, _):
+        self._update_state()
+
+    @traitlets.observe('process')
+    def _observe_process(self, change):
+        self._update_state()

@@ -162,6 +162,7 @@
   "pseudo_info": {
     "element": "Si",
     "pp_type": "NC",
-    "z_valence": 4
+    "z_valence": 4,
+    "label": "sg15/v1.0(z=4)"
   }
 }
