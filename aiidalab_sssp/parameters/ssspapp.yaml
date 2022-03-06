@@ -1,0 +1,14 @@
+---
+# Default builder parameters for the SsspAppWorkChain
+
+## Properties
+run_delta: true
+run_conv_cohesive: true
+
+## Codes
+ph_code: ph-6.7@localhost
+pw_code: pw-6.7@localhost
+
+## Calculation settings
+calc_protocol: test
+cri_protocol: efficiency

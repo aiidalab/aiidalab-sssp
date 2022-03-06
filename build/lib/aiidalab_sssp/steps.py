@@ -1,7 +1,6 @@
 """widget for pseudo inmport"""
 import os
 import io
-from textwrap import indent
 
 import ipywidgets as ipw
 import traitlets
@@ -10,24 +9,117 @@ from IPython.display import clear_output
 from aiida import orm
 from aiida.plugins import DataFactory, WorkflowFactory
 from aiida.engine import submit, ProcessState
-from aiida.orm import ProcessNode, Node, load_code
-from aiida.common import NotExistent
+from aiida.orm import ProcessNode, Node
 
 from aiida_sssp_workflow.utils import helper_parse_upf
-
-from aiidalab_sssp.parameters import DEFAULT_PARAMETERS
 
 from aiidalab_widgets_base import (
     CodeDropdown,
     ProcessMonitor,
     ProcessNodesTreeWidget,
     WizardAppWidgetStep,
-    viewer,
-    ComputationalResourcesWidget,
+    viewer
 )
 
 UpfData = DataFactory('pseudo.upf')
 VerificationWorkChain = WorkflowFactory('sssp_workflow.verification')
+
+class PseudoInputStep(ipw.VBox, WizardAppWidgetStep):
+    """
+    Upload a pesudopotential and store it as UpfData in database
+    """
+    pseudo = traitlets.Instance(UpfData, allow_none=True)
+    pseudo_filename = traitlets.Unicode(allow_none=False)
+    confirmed_pseudo = traitlets.Instance(UpfData, allow_none=True)
+
+    def __init__(self, description=None, **kwargs):
+        self.pseudo_upload_widget = PseudoUploadWidget()
+        if description is None:
+            description = ipw.Label(
+                'Select a pseudopotential from one of the following sources and then '
+                'click "Confirm" to go to the next step.')
+        self.description = description
+
+        self.pseudo_name_text = ipw.Text(
+            placeholder='[No pseudo selected]',
+            description='Selected:',
+            disabled=True,
+            layout=ipw.Layout(width='auto'),
+        )
+
+        self.confirm_button = ipw.Button(
+            description='Confirm',
+            tooltip=
+            "Confirm the currently selected pseudopotential and go to the next step.",
+            button_style='success',
+            icon='check-circle',
+            disabled=True,
+            layout=ipw.Layout(width='auto'),
+        )
+        self.confirm_button.on_click(self.confirm)
+
+        # Create directional link from the (read-only) 'pseudo_node' traitlet of the
+        # pseudo upload widget to our 'pseudo' traitlet:
+        ipw.dlink((self.pseudo_upload_widget, 'pseudo'), (self, 'pseudo'))
+        ipw.dlink((self.pseudo_upload_widget, 'pseudo_filename'),
+                  (self, 'pseudo_filename'))
+
+        super().__init__(children=[
+            self.description, self.pseudo_upload_widget, self.pseudo_name_text,
+            self.confirm_button
+        ],
+        **kwargs)
+                         
+    @traitlets.default('state')
+    def _default_state(self):
+        return self.State.INIT
+
+    def _update_state(self):
+        if self.pseudo is None:
+            if self.confirmed_pseudo is None:
+                self.state = self.State.READY
+            else:
+                self.state = self.State.SUCCESS
+        else:
+            if self.confirmed_pseudo is None:
+                self.state = self.State.CONFIGURED
+            else:
+                self.state = self.State.SUCCESS
+
+    @traitlets.observe('pseudo_filename')
+    def _observe_pseudo_filename(self, change):
+        pseudo_filename = change['new']
+        with self.hold_trait_notifications():
+            self.pseudo_name_text.value = pseudo_filename.split('.')[0]
+
+    @traitlets.observe('pseudo')
+    def _observe_pseudo(self, change):
+        # the first time set the pseudo
+        if self.pseudo:
+            self.confirm_button.disabled = False
+
+        # after set the new pseudo
+        if self.pseudo != change['new']:
+            self.confirm_button.disabled = False
+
+    @traitlets.observe('confirmed_pseudo')
+    def _observe_confirmed_structure(self, _):
+        with self.hold_trait_notifications():
+            self._update_state()
+
+    @traitlets.observe('state')
+    def _observe_state(self, change):
+        with self.hold_trait_notifications():
+            state = change['new']
+            self.confirm_button.disabled = state != self.State.CONFIGURED
+
+    def confirm(self, _=None):
+        self.confirmed_pseudo = self.pseudo
+        self.confirm_button.disabled = True 
+
+    def reset(self):  # unconfirm
+        self.confirmed_structure = None
+
 
 class PseudoUploadWidget(ipw.VBox):
     """Class that allows to upload pseudopotential from user's computer."""
@@ -57,261 +149,6 @@ Supported pseudo formats (Now only support UPF type)
         except ValueError:
             print('wrong pseudopotential file type. (Only UPF support now)')
 
-class PseudoSelectionStep(ipw.VBox, WizardAppWidgetStep):
-    """
-    Upload a pesudopotential and store it as UpfData in database
-    """
-    pseudo = traitlets.Instance(UpfData, allow_none=True)
-    confirmed_pseudo = traitlets.Instance(UpfData, allow_none=True)
-
-    def __init__(self, description=None, **kwargs):
-        self.pseudo_upload_widget = PseudoUploadWidget()
-
-        if description is None:
-            description = ipw.HTML(
-                """
-                <p>Select a pseudopotential from one of the following sources and then
-                click "Confirm" to go to the next step.</p><i class="fa fa-exclamation-circle"
-                aria-hidden="true"></i> Currently only UPF pseudopotential file are
-                supported.
-                """
-            )
-        self.description = description
-
-        self.pseudo_name_text = ipw.Text(
-            placeholder='[No pseudo selected]',
-            description='Selected:',
-            disabled=True,
-            layout=ipw.Layout(width='auto'),
-        )
-
-        self.confirm_button = ipw.Button(
-            description='Confirm',
-            tooltip=
-            "Confirm the currently selected pseudopotential and go to the next step.",
-            button_style='success',
-            icon='check-circle',
-            disabled=True,
-            layout=ipw.Layout(width='auto'),
-        )
-        self.confirm_button.on_click(self.confirm)
-        self.message_area = ipw.HTML()
-
-        # Create directional link from the (read-only) 'pseudo_node' traitlet of the
-        # pseudo upload widget to our 'pseudo' traitlet:
-        ipw.dlink((self.pseudo_upload_widget, 'pseudo'), (self, 'pseudo'))
-
-        super().__init__(
-            children=[
-                self.description, 
-                self.pseudo_upload_widget, 
-                self.pseudo_name_text,
-                self.message_area,
-                self.confirm_button
-            ],
-            **kwargs
-        )
-                         
-    @traitlets.default('state')
-    def _default_state(self):
-        return self.State.INIT
-
-    def _update_state(self):
-        if self.pseudo is None:
-            if self.confirmed_pseudo is None:
-                self.state = self.State.READY
-            else:
-                self.state = self.State.SUCCESS
-        else:
-            if self.confirmed_pseudo is None:
-                self.state = self.State.CONFIGURED
-            else:
-                self.state = self.State.SUCCESS
-
-    @traitlets.observe('pseudo')
-    def _observe_pseudo(self, change):
-        pseudo = change['new']
-        with self.hold_trait_notifications():
-            if pseudo is None:
-                self.pseudo_name_text.value = ""
-                self.message_area.value = ""
-            else:
-                pseudo_filename = self.pseudo_upload_widget.pseudo_filename
-                self.pseudo_name_text.value = pseudo_filename.split('.')[0]
-                # TODO: with more psp info parse from file
-
-                self.message_area.value = ""
-
-            self._update_state()
-
-    @traitlets.observe('confirmed_pseudo')
-    def _observe_confirmed_structure(self, _):
-        with self.hold_trait_notifications():
-            self._update_state()
-
-    @traitlets.observe('state')
-    def _observe_state(self, change):
-        with self.hold_trait_notifications():
-            state = change['new']
-            self.confirm_button.disabled = state != self.State.CONFIGURED
-
-    def can_reset(self):
-        return self.confirmed_pseudo is not None
-
-    def confirm(self, _=None):
-        self.confirmed_pseudo = self.pseudo
-
-    def reset(self):  # unconfirm
-        self.confirmed_structure = None
-
-
-class WorkChainSettings(ipw.VBox):
-
-    protocol_title = ipw.HTML(
-        """<div style="padding-top: 0px; padding-bottom: 0px">
-        <h4>Protocol</h4></div>"""
-    )
-    protocol_help = ipw.HTML(
-        """<div style="line-height: 140%; padding-top: 6px; padding-bottom: 0px">
-        The calculation protocol setup the parameters used for pseudopotential 
-        verification. The criteria protocol determine when the wavefunction and 
-        charge density cutoff tests are converged.
-        The "THEOS" calculation protocol represents a set of parameters compatible 
-        with aiida-common-workflow.
-        Choose the "efficiency" protocol for cutoff test to give a efficiency 
-        pseudopotential. The "precision" protocol that provides more
-        accuracy pseudopotential but will take longer.</div>"""
-    )
-
-    def __init__(self, **kwargs):
-
-        self.delta_run = ipw.Checkbox(
-            description="",
-            tooltip="Calculate the delta measure w.r.t AE.",
-            indent=False,
-            value=True,
-            layout=ipw.Layout(max_width="10%"),
-        )
-        self.conv_cohesive_run = ipw.Checkbox(
-            description="",
-            tooltip="Convergence test on cohesive energy.",
-            indent=False,
-            value=True,
-            layout=ipw.Layout(max_width="10%"),
-        )
-
-        # TODO: phonos and pressure
-
-        # Work chain protocol
-        self.workchain_calc_protocol = ipw.ToggleButtons(
-            options=["theos", "test"],
-            value="test",
-        )
-
-        self.workchain_cri_protocol = ipw.ToggleButtons(
-            options=["efficiency", "precision"],
-            value="efficiency",
-        )
-
-        super().__init__(
-            children=[
-                ipw.HTML("Select which properties to verified:"),
-                ipw.HBox(children=[ipw.HTML("<b>Delta measure</b>"), self.delta_run]),
-                ipw.HBox(children=[ipw.HTML("<b>Convergence: cohesive energy</b>"), self.conv_cohesive_run]),
-                ipw.HTML("Select the calculation protocol:", layout=ipw.Layout(flex="1 1 auto")),
-                self.protocol_title,
-                self.workchain_calc_protocol,
-                self.workchain_cri_protocol,
-                self.protocol_help,
-            ],
-            **kwargs,
-        )
-
-
-class ConfigureSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
-
-    confirmed = traitlets.Bool()
-    previous_step_state = traitlets.UseEnum(WizardAppWidgetStep.State)
-    workchain_settings = traitlets.Instance(WorkChainSettings, allow_none=True)
-
-    def __init__(self, **kwargs):
-        self.workchain_settings = WorkChainSettings()
-        self.workchain_settings.delta_run.observe(self._update_state, "value")
-        self.workchain_settings.conv_cohesive_run.observe(self._update_state, "value")
-
-        self._submission_blocker_messages = ipw.HTML()
-
-        self.confirm_button = ipw.Button(
-            description="Confirm",
-            tooltip="Confirm the currently selected settings and go to the next step.",
-            button_style="success",
-            icon="check-circle",
-            disabled=True,
-            layout=ipw.Layout(width="auto"),
-        )
-
-        self.confirm_button.on_click(self.confirm)
-
-        super().__init__(
-            children=[
-                self.workchain_settings,
-                self._submission_blocker_messages,
-                self.confirm_button,
-            ],
-            **kwargs,
-        )
-
-    @traitlets.observe("previous_step_state")
-    def _observe_previous_step_state(self, change):
-        self._update_state()
-
-    def set_input_parameters(self, parameters):
-        """Set the inputs in the GUI based on a set of parameters."""
-
-        with self.hold_trait_notifications():
-            # Wor chain settings
-            self.workchain_settings.delta_run.value = parameters['run_delta']
-            self.workchain_settings.conv_cohesive_run = parameters['run_conv_cohesive']
-            self.workchain_settings.workchain_calc_protocol = parameters['calc_protocol']
-            self.workchain_settings.workchain_cri_protocol = parameters['cri_protocol']
-
-    def _update_state(self, _=None):
-        if self.previous_step_state == self.State.SUCCESS:
-            self.confirm_button.disabled = False
-            if not (
-                self.workchain_settings.delta_run.value
-                or self.workchain_settings.conv_cohesive_run.value
-            ):
-                self.confirm_button.disabled = True
-                self.state = self.State.READY
-                self._submission_blocker_messages.value = """
-                    <div class="alert alert-info">
-                    The configured work chain would not actually compute anything.
-                    Select either at least one of the
-                    the delta measure or the convergence calculations or both.</div>"""
-            else:
-                self._submission_blocker_messages.value = ""
-                self.state = self.State.CONFIGURED
-        elif self.previous_step_state == self.State.FAIL:
-            self.state = self.State.FAIL
-        else:
-            self.confirm_button.disabled = True
-            self.state = self.State.INIT
-            self.set_input_parameters(DEFAULT_PARAMETERS)
-
-    def confirm(self, _None):
-        self.confirm_button.disabled = False
-        self.state = self.State.SUCCESS
-
-    @traitlets.default("state")
-    def _default_state(self):
-        return self.State.INIT
-
-    def rest(self):
-        with self.hold_trait_notifications():
-            self.set_input_parameters(DEFAULT_PARAMETERS)
-
-
 class NodeViewWidget(ipw.VBox):
 
     node = traitlets.Instance(Node, allow_none=True)
@@ -334,9 +171,7 @@ class ViewSsspAppWorkChainStatusAndResultsStep(ipw.VBox, WizardAppWidgetStep):
 
     def __init__(self, **kwargs):
         self.process_tree = ProcessNodesTreeWidget()
-        self.verification_status = ShowVerificationStatus()
         ipw.dlink((self, "process"), (self.process_tree, "process"))
-        ipw.dlink((self, "process"), (self.verification_status, "process"))
 
         self.node_view = NodeViewWidget(layout={"width": "auto", "height": "auto"})
         ipw.dlink(
@@ -356,10 +191,7 @@ class ViewSsspAppWorkChainStatusAndResultsStep(ipw.VBox, WizardAppWidgetStep):
         )
         ipw.dlink((self, "process"), (self.process_monitor, "process"))
 
-        super().__init__([
-            self.process_status,
-            self.verification_status,
-        ], **kwargs)
+        super().__init__([self.process_status], **kwargs)
 
     def can_reset(self):
         "Do not allow reset while process is running."
@@ -473,28 +305,26 @@ class ResourceSelectionWidget(ipw.VBox):
     def reset(self):
         self.num_mpi_tasks.value = 1
 
-class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
+class SubmitVerificationStep(ipw.VBox, WizardAppWidgetStep):
     """step of submit verification"""
 
     process = traitlets.Instance(ProcessNode, allow_none=True)
-    pseudo = traitlets.Instance(UpfData, allow_none=True)
-    previous_step_state = traitlets.UseEnum(WizardAppWidgetStep.State)
+    input_pseudo = traitlets.Instance(UpfData, allow_none=True)
 
     _submission_blockers = traitlets.List(traitlets.Unicode)
 
     skip = False
 
     def __init__(self, **kwargs):
-        self.pw_code = ComputationalResourcesWidget(
-            description="pw.x:", input_plugin="quantumespresso.pw"
-        )
-        self.ph_code = ComputationalResourcesWidget(
-            description="ph.x:",
-            input_plugin="quantumespresso.ph",
-        )
+        self.pw_code = CodeDropdown(input_plugin='quantumespresso.pw',
+                               description="PW code")
+        self.ph_code = CodeDropdown(input_plugin='quantumespresso.ph',
+                               description="PH code")
 
-        self.pw_code.observe(self._update_state, "value")
-        self.ph_code.observe(self._update_state, "value")
+        self.pw_code.observe(self._update_state, "selected_code")
+        self.ph_code.observe(self._update_state, "selected_code")
+
+        self.code_group = ipw.VBox(children=[self.pw_code, self.ph_code])
 
         protocol_list = ['efficiency', 'precision', 'test'] # will read from sssp plugin
 
@@ -534,6 +364,13 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
         self.protocol = ipw.ToggleButtons(
             options=protocol_list,
             value='efficiency')
+
+        self.dual= ipw.BoundedIntText(
+            value=8,
+            step=1,
+            min=1,
+            description="# dual (ecutrho/ecutwfc)",
+            **option_box_extra)
 
         self.query_pp_element = ipw.Text(
             value='Undetected',
@@ -603,6 +440,7 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
                 protocol_prompt,
                 self.protocol,
                 dual_prompt,
+                self.dual,
                 properties_setting,
             ]
         )
@@ -710,6 +548,15 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
         self.buttons = ipw.HBox(
             children=[self.verify_button, self.skip_button])
 
+        self.config_tabs = ipw.Tab(
+            children=[self.settings, self.code_group, self.resources, self.set_extra_metadata],
+            layout=ipw.Layout(min_height='250px'),
+        )
+        self.config_tabs.set_title(0, 'Verification Setting')
+        self.config_tabs.set_title(1, 'Codes Setting')
+        self.config_tabs.set_title(2, 'Compute Resources Setting')
+        self.config_tabs.set_title(3, 'Extra Metadata')
+
         # this is for display the information read from the pseudopotential file, element and pp_type etc.
         self.basic_pseudo_info = ipw.Label('')
         self.basic_pseudo_info.layout.visibility = "hidden"
@@ -724,10 +571,7 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
             children=[
                 self.basic_pseudo_info, 
                 description, 
-                self.settings,
-                self.pw_code,
-                self.ph_code,
-                self.set_extra_metadata,
+                self.config_tabs,
                 self._submission_blocker_messages, 
                 self.buttons,
             ], **kwargs)
@@ -793,11 +637,12 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
         """Run the workflow to calculate delta factor"""
         builder = VerificationWorkChain.get_builder()
 
-        builder.pseudo = self.pseudo
+        builder.pseudo = self.input_pseudo
         builder.pw_code = self.pw_code.selected_code
         builder.ph_code = self.ph_code.selected_code
 
         builder.protocol = orm.Str(self.protocol.value)
+        builder.dual = orm.Float(self.dual.value)
         builder.properties_list = orm.List(list=self.properties_list)
 
         builder.options = orm.Dict(dict=self.options)
@@ -812,7 +657,7 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
             'pp_type': self.query_pp_type.value,
             'pp_family': self.query_pp_family.value,
             'pp_version': self.query_pp_version.value,
-            'pp_filename': self.pseudo.filename,
+            'pp_filename': self.input_pseudo.filename,
             'pp_label': self.extra_label.value,
             }
         self.process.set_extra_many(extras)
@@ -824,12 +669,12 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
         with self.hold_trait_notifications():
             process_node = change['new']
             if process_node is not None:
-                self.pseudo = process_node.inputs.pseudo
+                self.input_pseudo = process_node.inputs.pseudo
                 # TODO: I can do builder parameters setting here
             self._update_state()
 
-    @traitlets.observe("pseudo")
-    def _observe_pseudo(self, change):
+    @traitlets.observe("input_pseudo")
+    def _observe_input_pseudo(self, change):
         # self.set_input_parameters(DEFAULT_PARAMETERS)
         self._update_state()
         # self._set_num_mpi_tasks_to_default()
@@ -843,6 +688,12 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
             self.query_pp_element.value = pseudo.element
             self.query_pp_type.value = pp_type
 
+            # set dual upon pp type
+            if pp_type == 'NC':
+                self.dual.value = 4
+            else:
+                self.dual.value = 8
+
             # display description on step 2
             self.basic_pseudo_info.layout.visibility = 'visible'
             self.basic_pseudo_info.value = f'The pseudopotential you uploaded: element={pseudo.element}, pp_type={pp_type}'
@@ -854,7 +705,7 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
             return self.State.SUCCESS
 
         # Input structure not specified.
-        if self.pseudo is None:
+        if self.input_pseudo is None:
             self._submission_blockers = ["No pseudo selected."]
             # This blocker is handled differently than the other blockers,
             # because it is displayed as INIT state.
@@ -873,7 +724,7 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
 
     def _identify_submission_blockers(self):
         # No input pseudo specified.
-        if self.pseudo is None:
+        if self.input_pseudo is None:
             yield "No pseudo selected."
 
         # No code selected (this is ignored while the setup process is running).
