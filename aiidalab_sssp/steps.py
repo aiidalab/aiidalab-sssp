@@ -897,6 +897,8 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
         self.submit_button.disabled = True
         self.submit()
 
+        self.state = self.State.SUCCESS
+
     # @traitlets.observe('process')
     # def _observe_process(self, change):
     #     with self.hold_trait_notifications():
@@ -999,7 +1001,7 @@ class ViewSsspAppWorkChainStatusAndResultsStep(ipw.VBox, WizardAppWidgetStep):
 
         super().__init__([
             self.process_status,
-            self.verification_status,
+            # self.verification_status,
         ], **kwargs)
 
     def can_reset(self):

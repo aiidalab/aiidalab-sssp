@@ -8,6 +8,8 @@
 .idea
 .ipynb_checkpoints/
 .*.ipynb
+.do-not-setup-on-localhost
+build
 
 .vscode
 pseduos_json_demo/*

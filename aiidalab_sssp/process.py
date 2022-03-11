@@ -67,7 +67,7 @@ class WorkChainSelector(ipw.HBox):
     def find_work_chains(cls):
         builder = CalculationQueryBuilder()
         filters = builder.get_filters(
-            process_label="DeltaFactorWorkChain",
+            process_label="VerificationWorkChain",
         )
         query_set = builder.get_query_set(
             filters=filters,
