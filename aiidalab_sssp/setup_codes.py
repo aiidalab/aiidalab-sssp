@@ -2,10 +2,10 @@
 from pathlib import Path
 from shutil import which
 from subprocess import CalledProcessError, run
-from threading import Thread, Event
+from threading import Event, Thread
 from time import time
-import ipywidgets as ipw
 
+import ipywidgets as ipw
 import traitlets
 from aiida.common.exceptions import NotExistent
 from aiida.orm import load_code
@@ -294,6 +294,7 @@ class QESetupWidget(ipw.VBox):
     def _trigger_reinstall(self, _=None):
         FN_DO_NOT_SETUP.unlink()
         self.refresh()
+
 
 class ProgressBar(ipw.HBox):
     class AnimationRate(float):
