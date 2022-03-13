@@ -167,8 +167,8 @@ class WorkChainSettings(ipw.VBox):
 
     protocol_help = ipw.HTML(
         """<div style="line-height: 140%; padding-top: 6px; padding-bottom: 0px">
-        The calculation protocol setup the parameters used for pseudopotential
-        verification. The criteria protocol determine when the wavefunction and
+        The protocol setup the parameters used for pseudopotential
+        verification. The criteria determine when the wavefunction and
         charge density cutoff tests are converged.
         The "THEOS" calculation protocol represents a set of parameters compatible
         with aiida-common-workflow.
@@ -217,14 +217,21 @@ class WorkChainSettings(ipw.VBox):
         self.properties_list = DEFAULT_PROPERTIES_LIST
 
         # Work chain protocol
-        self.protocol_calculation = ipw.ToggleButtons(
+        self.protocol = ipw.ToggleButtons(
             options=["theos", "test"],
-            value="test",
+            value="theos",
         )
 
-        self.protocol_criteria = ipw.ToggleButtons(
+        self.criteria = ipw.ToggleButtons(
             options=["efficiency", "precision"],
             value="efficiency",
+        )
+        self.quick_run = ipw.Checkbox(
+            desciption="",
+            tooltip="Tick so can run without cluster.",
+            indent=False,
+            value=False,
+            layout=ipw.Layout(max_width="10%"),
         )
 
         super().__init__(
@@ -250,15 +257,21 @@ class WorkChainSettings(ipw.VBox):
                     ]
                 ),
                 ipw.HTML(
-                    "Select the calculation protocol:",
+                    "Select protocol:",
                     layout=ipw.Layout(flex="1 1 auto"),
                 ),
-                self.protocol_calculation,
-                ipw.HTML(
-                    "Select the criteria protocol:", layout=ipw.Layout(flex="1 1 auto")
-                ),
-                self.protocol_criteria,
+                self.protocol,
+                ipw.HTML("Select criteria:", layout=ipw.Layout(flex="1 1 auto")),
+                self.criteria,
                 self.protocol_help,
+                ipw.HBox(
+                    children=[
+                        self.quick_run,
+                        ipw.HTML(
+                            "<b>QUICK RUN: Low max cuoff and sparse cutoff list therefore local resource tolerant.</b>"
+                        ),
+                    ]
+                ),
             ],
             **kwargs,
         )
@@ -321,14 +334,19 @@ class ConfigureSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
         """Set the inputs in the GUI based on a set of parameters."""
         with self.hold_trait_notifications():
             # Wor chain settings
-            self.workchain_settings.delta_run.value = parameters["run_delta"]
+            self.workchain_settings.delta_run.value = parameters["delta_run"]
             self.workchain_settings.conv_cohesive_run.value = parameters[
-                "run_conv_cohesive"
+                "conv_cohesive_run"
             ]
-            self.workchain_settings.protocol_calculation.value = parameters[
-                "calc_protocol"
+            self.workchain_settings.conv_phonon_run.value = parameters[
+                "conv_phonon_run"
             ]
-            self.workchain_settings.protocol_criteria.value = parameters["cri_protocol"]
+            self.workchain_settings.conv_pressure_run.value = parameters[
+                "conv_pressure_run"
+            ]
+            self.workchain_settings.protocol.value = parameters["protocol"]
+            self.workchain_settings.criteria.value = parameters["criteria"]
+            self.workchain_settings.quick_run.value = parameters["quick_run"]
 
     def _update_state(self, _=None):
         if self.previous_step_state == self.State.SUCCESS:
@@ -495,9 +513,7 @@ class SettingPseudoMetadataStep(ipw.VBox, WizardAppWidgetStep):
             self._psp_type = header.get("pseudo_type", None)
             self._psp_element = self.pseudo.element
 
-            self.title.value = (
-                f"<p>Element: {self._psp_element}, Type: {self._psp_type}</p>"
-            )
+            self.title.value = f"<p>Element: {self._psp_element}, Type: {self._psp_type}, z={self.pseudo.z_valence}</p>"
 
     def confirm(self, _None):
         if not (
@@ -812,11 +828,12 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
         builder.pw_code = self.pw_code.value
         builder.ph_code = self.ph_code.value
 
-        builder.protocol_calculation = orm.Str(
-            self.workchain_settings.protocol_calculation.value
-        )
-        builder.protocol_criteria = orm.Str(
-            self.workchain_settings.protocol_criteria.value
+        builder.protocol = orm.Str(self.workchain_settings.protocol.value)
+        builder.criteria = orm.Str(self.workchain_settings.criteria.value)
+        builder.cutoff_control = (
+            orm.Str("local")
+            if self.workchain_settings.quick_run.value
+            else orm.Str("cluster")
         )
         builder.properties_list = orm.List(list=self.workchain_settings.properties_list)
 
@@ -859,22 +876,13 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
         extras["psp_label"] = label
         self.process.set_extra_many(extras)
 
-        self.process.description = self.metadata_settings.description
+        self.process.description = self.metadata_settings.description.value
 
     def _on_submit_button_clicked(self, _):
         self.submit_button.disabled = True
         self.submit()
 
         self.state = self.State.SUCCESS
-
-    # @traitlets.observe('process')
-    # def _observe_process(self, change):
-    #     with self.hold_trait_notifications():
-    #         process_node = change['new']
-    #         if process_node is not None:
-    #             self.pseudo = process_node.inputs.pseudo
-    #             # TODO: I can do builder parameters setting here
-    #         self._update_state()
 
     @traitlets.observe("pseudo")
     def _observe_pseudo(self, change):
