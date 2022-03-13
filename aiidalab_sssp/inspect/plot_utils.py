@@ -1,13 +1,42 @@
+import random
+
 import matplotlib.pyplot as plt
 import numpy as np
+
+
+def cmap(label: str) -> str:
+    """Return RGB string of color for given standard psp label"""
+    _, pp_family, pp_z, pp_type, pp_version = label.split("/")
+
+    if pp_family == "sg15" and pp_version == "v1.0":
+        return "#000000"
+
+    if pp_family == "sg15" and pp_version == "v1.2":
+        return "#708090"
+
+    if pp_family == "gbrv" and pp_version == "v1":
+        return "#4682B4"
+
+    if pp_family == "psl" and pp_version == "v1.0.0" and pp_type == "us":
+        return "#F50E02"
+
+    if pp_family == "psl" and pp_version == "v1.0.0" and pp_type == "paw":
+        return "#2D8B00F"
+
+    if pp_family == "dojo" and pp_version == "v04":
+        return "#F9A501"
+
+    # TODO: more mapping
+    # if a unknow type generate random color based on ascii sum
+    ascn = sum([ord(c) for c in label])
+    random.seed(ascn)
+    return "#%06x" % random.randint(0, 0xFFFFFF)
 
 
 def delta_measure_hist(pseudos: dict, measure_type):
 
     px = 1 / plt.rcParams["figure.dpi"]  # pixel in inches
     fig, ax = plt.subplots(1, 1, figsize=(1024 * px, 360 * px))
-    cmap = plt.get_cmap("tab20")
-    NUM_COLOR = 20
     structures = ["X", "XO", "X2O", "XO3", "X2O", "X2O3", "X2O5"]
     num_structures = len(structures)
 
@@ -23,7 +52,7 @@ def delta_measure_hist(pseudos: dict, measure_type):
         ylabel = "Δ -factor"
     elif measure_type == "nv_delta":
         keyname = "rel_errors_vec_length"
-        ylabel = "νΔ -factor"
+        ylabel = "ν -factor"
 
     for i, (label, output) in enumerate(pseudos.items()):
         N = len(structures)
@@ -44,7 +73,13 @@ def delta_measure_hist(pseudos: dict, measure_type):
         out_label = f"{pp_z}/{pp_type}({pp_family}-{pp_version})"
 
         ax.bar(
-            idx + width * i, y_delta, width, color=cmap(i / NUM_COLOR), label=out_label
+            idx + width * i,
+            y_delta,
+            width,
+            color=cmap(label),
+            edgecolor="black",
+            linewidth=1,
+            label=out_label,
         )
         ax.legend()
         ax.set_title(f"X={element}")
@@ -65,10 +100,8 @@ def convergence(pseudos: dict, wf_name, measure_name, ylabel, threshold=None):
     fig, (ax1, ax2) = plt.subplots(
         1, 2, gridspec_kw={"width_ratios": [2, 1]}, figsize=(1024 * px, 360 * px)
     )
-    cmap = plt.get_cmap("tab20")
-    NUM_COLOR = 20
 
-    for i, (label, output) in enumerate(pseudos.items()):
+    for label, output in pseudos.items():
         # Calculate the avg delta measure value
         structures = ["X", "XO", "X2O", "XO3", "X2O", "X2O3", "X2O5"]
         lst = []
@@ -94,18 +127,14 @@ def convergence(pseudos: dict, wf_name, measure_name, ylabel, threshold=None):
             wfc_cutoff = res["final_output_parameters"]["wfc_cutoff"]
 
             _, pp_family, pp_z, pp_type, pp_version = label.split("/")
-            out_label = (
-                f"{pp_z}/{pp_type}(νΔ={avg_delta:.2f})({pp_family}-{pp_version})"
-            )
+            out_label = f"{pp_z}/{pp_type}(ν={avg_delta:.2f})({pp_family}-{pp_version})"
 
-            ax1.plot(
-                x_wfc, y_wfc, marker="o", color=cmap(i / NUM_COLOR), label=out_label
-            )
+            ax1.plot(x_wfc, y_wfc, marker="o", color=cmap(label), label=out_label)
             ax2.plot(
                 x_rho,
                 y_rho,
                 marker="o",
-                color=cmap(i / NUM_COLOR),
+                color=cmap(label),
                 label=f"cutoff wfc = {wfc_cutoff} Ry",
             )
         except Exception:
