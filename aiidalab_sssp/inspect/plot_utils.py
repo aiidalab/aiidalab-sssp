@@ -62,7 +62,7 @@ def delta_measure_hist(pseudos: dict, measure_type):
         y_delta = []
         for structure in structures:
             try:
-                res = output["delta_factor"]["output_delta_analyze"][
+                res = output["delta_measure"]["output_delta_analyze"][
                     f"output_{structure}"
                 ]
                 y_delta.append(res[keyname])
@@ -107,7 +107,7 @@ def convergence(pseudos: dict, wf_name, measure_name, ylabel, threshold=None):
         lst = []
         for structure in structures:
             try:
-                res = output["delta_factor"]["output_delta_analyze"][
+                res = output["delta_measure"]["output_delta_analyze"][
                     f"output_{structure}"
                 ]
                 lst.append(res["rel_errors_vec_length"])

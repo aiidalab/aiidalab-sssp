@@ -279,7 +279,7 @@ class WorkChainSettings(ipw.VBox):
     def _update_properties_list(self, _):
         lst = []
         if self.delta_run.value:
-            lst.append("delta_factor")
+            lst.append("delta_measure")
 
         if self.conv_cohesive_run.value:
             lst.append("convergence:cohesive_energy")
@@ -1038,16 +1038,16 @@ class ShowVerificationStatus(ipw.VBox):
     def __init__(self, **kwargs):
         init_info = parse_state_to_info(None)
 
-        self.delta_factor_state = ipw.HTML(init_info)
+        self.delta_measure_state = ipw.HTML(init_info)
         self.pressure_state = ipw.HTML(init_info)
         self.cohesive_energy_state = ipw.HTML(init_info)
         self.phonon_frequencies_state = ipw.HTML(init_info)
         self.bands_distance_state = ipw.HTML(init_info)
 
-        status_delta_factor = ipw.HBox(
+        status_delta_measure = ipw.HBox(
             children=[
                 ipw.HTML("Delta factor:"),
-                self.delta_factor_state,
+                self.delta_measure_state,
             ]
         )
         status_conv_pressure = ipw.HBox(
@@ -1082,7 +1082,7 @@ class ShowVerificationStatus(ipw.VBox):
 
         super().__init__(
             children=[
-                status_delta_factor,
+                status_delta_measure,
                 status_conv_cohesive_energy,
                 status_conv_pressure,
                 status_conv_phonon,
@@ -1106,7 +1106,7 @@ class ShowVerificationStatus(ipw.VBox):
             info = parse_state_to_info(process_state, exit_status)
 
             if label == "DeltaFactorWorkChain":
-                res["delta_factor"] = info
+                res["delta_measure"] = info
 
             if label == "ConvergencePressureWorkChain":
                 res["convergence:pressure"] = info
@@ -1124,7 +1124,9 @@ class ShowVerificationStatus(ipw.VBox):
             infos = self._get_verification_info(self.process)
             not_running_text = parse_state_to_info(None)
 
-            self.delta_factor_state.value = infos.get("delta_factor", not_running_text)
+            self.delta_measure_state.value = infos.get(
+                "delta_measure", not_running_text
+            )
             self.pressure_state.value = infos.get(
                 "convergence:pressure", not_running_text
             )
