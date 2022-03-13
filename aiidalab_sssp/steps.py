@@ -841,7 +841,7 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
         builder.protocol = orm.Str(self.workchain_settings.protocol.value)
         builder.criteria = orm.Str(self.workchain_settings.criteria.value)
         builder.cutoff_control = (
-            orm.Str("local")
+            orm.Str("test")  # FIXME test only for dev, should be `local` in production
             if self.workchain_settings.quick_run.value
             else orm.Str("cluster")
         )
