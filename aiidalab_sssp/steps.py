@@ -31,10 +31,8 @@ VerificationWorkChain = WorkflowFactory("sssp_workflow.verification")
 class PseudoUploadWidget(ipw.VBox):
     """Class that allows to upload pseudopotential from user's computer."""
 
-    pseudo = traitlets.Instance(UpfData, allow_none=True)
-    message = traitlets.Unicode()
-
-    pseudo_filename: str
+    file_pseudo = traitlets.Tuple()
+    error_message = traitlets.Unicode()
 
     def __init__(self, title="", description="Upload Pseudopotential"):
         self.title = title
@@ -48,7 +46,7 @@ Supported pseudo formats (Now only support UPF type)
 </a>"""
         )
         self.file_upload.observe(self._on_file_upload, names="value")
-        self.message = ""
+        self.error_message = ""
         super().__init__(children=[self.file_upload, supported_formats])
 
     def _on_file_upload(self, change=None):
@@ -59,10 +57,11 @@ Supported pseudo formats (Now only support UPF type)
 
             # Order matters make sure when pseudo change
             # the pseudo_filename is set
-            self.pseudo_filename = fname
-            self.pseudo = UpfData(io.BytesIO(content))
+            self.file_pseudo = (fname, UpfData(io.BytesIO(content)))
         except ValueError:
-            self.message = "wrong pseudopotential file type. (Only UPF support now)"
+            self.error_message = (
+                "wrong pseudopotential file type. (Only UPF support now)"
+            )
 
 
 class PseudoSelectionStep(ipw.VBox, WizardAppWidgetStep):
@@ -71,11 +70,12 @@ class PseudoSelectionStep(ipw.VBox, WizardAppWidgetStep):
     """
 
     pseudo = traitlets.Instance(UpfData, allow_none=True)
+    pseudo_filename = traitlets.Unicode(allow_none=True)
     confirmed_pseudo = traitlets.Instance(UpfData, allow_none=True)
 
     def __init__(self, **kwargs):
         self.pseudo_upload = PseudoUploadWidget()
-        self.pseudo_upload.observe(self._observe_pseudo_upload, "pseudo")
+        self.pseudo_upload.observe(self._observe_pseudo_upload, "file_pseudo")
 
         self.description = ipw.HTML(
             """
@@ -132,15 +132,15 @@ class PseudoSelectionStep(ipw.VBox, WizardAppWidgetStep):
 
     def _observe_pseudo_upload(self, _):
         with self.hold_trait_notifications():
-            if self.pseudo_upload.pseudo is None:
-                self.message_area.value = self.pseudo_upload.message
+            if self.pseudo_upload.file_pseudo is None:
+                self.message_area.value = self.pseudo_upload.error_message
             else:
                 # Upload then set pseudo and show filename on text board
-                self.pseudo_text.value = self.pseudo_upload.pseudo_filename
-                self.pseudo = self.pseudo_upload.pseudo
+                self.pseudo_filename, self.pseudo = self.pseudo_upload.file_pseudo
+                self.pseudo_text.value = self.pseudo_filename
 
-                if self.pseudo_upload.message:
-                    self.message_area.value = self.pseudo_upload.message
+                if self.pseudo_upload.error_message:
+                    self.message_area.value = self.pseudo_upload.error_message
 
             self._update_state()
 
@@ -400,6 +400,8 @@ class MetadataSettings(ipw.VBox):
     to identify the pseudopotentials.
     """
 
+    pseudo_filename = traitlets.Unicode(allow_none=True)
+
     def __init__(self, **kwargs):
         extra = {
             "style": {"description_width": "180px"},
@@ -438,6 +440,13 @@ class MetadataSettings(ipw.VBox):
             **kwargs,
         )
 
+    @traitlets.observe("pseudo_filename")
+    def _observe_pseudo_filename(self, _):
+        if "psl" in self.pseudo_filename:
+            self.psp_family.value = "psl"
+        else:
+            self.psp_family.value = "unknown"
+
 
 class SettingPseudoMetadataStep(ipw.VBox, WizardAppWidgetStep):
     """setting the extra metadata for the future query and description display of the pseudo"""
@@ -463,6 +472,7 @@ class SettingPseudoMetadataStep(ipw.VBox, WizardAppWidgetStep):
 
     def __init__(self, **kwargs):
         self.metadata_settings = MetadataSettings()
+
         self._psp_element = None
         self._psp_type = None
 
