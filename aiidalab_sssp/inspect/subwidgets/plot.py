@@ -34,11 +34,13 @@ class PlotDeltaMeasureWidget(ipw.VBox):
         if change["new"]:
             with out_nu:
                 fig = delta_measure_hist(change["new"], "nu")
-                display(fig)
+                fig.canvas.header_visible = False
+                display(fig.canvas)
 
             with out_delta:
                 fig = delta_measure_hist(change["new"], "delta")
-                display(fig)
+                fig.canvas.header_visible = False
+                display(fig.canvas)
 
         children = [out_nu, out_delta]
         self.measure_tab.children = children
@@ -76,7 +78,8 @@ class _PlotConvergenBaseWidget(ipw.VBox):
                     ylabel=self._YLABEL,
                     threshold=self._THRESHOLD,
                 )
-                display(fig)
+                fig.canvas.header_visible = False
+                display(fig.canvas)
 
 
 class PlotCohesiveEnergyConvergeWidget(_PlotConvergenBaseWidget):
@@ -130,7 +133,7 @@ class PlotPressureConvergeRelWidget(_PlotConvergenBaseWidget):
 class PlotDeltaConvergeWidget(_PlotConvergenBaseWidget):
 
     _WF = "convergence_delta"
-    _MEASURE = "cohesive_energy_per_atom"  # FIXME: should be `delta` bug in workflow fixed but DB update required
+    _MEASURE = "delta"
     _YLABEL = "Δ -factor (meV)"
     _THRESHOLD = None
 
