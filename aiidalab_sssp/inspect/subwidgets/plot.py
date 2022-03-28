@@ -108,7 +108,7 @@ class PlotPhononFrequenciesConvergeRelWidget(_PlotConvergenBaseWidget):
     _WF = "convergence_phonon_frequencies"
     _MEASURE = "relative_diff"
     _YLABEL = "Phonon frequencies ω (relative error, %)"
-    _THRESHOLD = 1.0
+    _THRESHOLD = 2.0
 
 
 class PlotPressureConvergeWidget(_PlotConvergenBaseWidget):
@@ -124,4 +124,28 @@ class PlotPressureConvergeRelWidget(_PlotConvergenBaseWidget):
     _WF = "convergence_pressure"
     _MEASURE = "relative_diff"
     _YLABEL = "Pressure (relative error, %)"
-    _THRESHOLD = 0.5
+    _THRESHOLD = 1.0
+
+
+class PlotDeltaConvergeWidget(_PlotConvergenBaseWidget):
+
+    _WF = "convergence_delta"
+    _MEASURE = "cohesive_energy_per_atom"  # FIXME: should be `delta` bug in workflow fixed but DB update required
+    _YLABEL = "Δ -factor (meV)"
+    _THRESHOLD = None
+
+
+class PlotDeltaConvergeRelWidget(_PlotConvergenBaseWidget):
+
+    _WF = "convergence_delta"
+    _MEASURE = "relative_diff"
+    _YLABEL = "Delta (relative error, %)"
+    _THRESHOLD = 2.0
+
+
+class PlotBandsConvergeWidget(_PlotConvergenBaseWidget):
+
+    _WF = "convergence_bands"
+    _MEASURE = "eta_c"
+    _YLABEL = "η up above fermi energe 5 eV (meV)"
+    _THRESHOLD = 20.0

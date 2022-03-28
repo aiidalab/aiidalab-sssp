@@ -3,6 +3,19 @@ import random
 import matplotlib.pyplot as plt
 import numpy as np
 
+CONFIGURATIONS = [
+    "BCC",
+    "FCC",
+    "SC",
+    "Diamond",
+    "XO",
+    "X2O",
+    "XO3",
+    "X2O",
+    "X2O3",
+    "X2O5",
+]
+
 
 def cmap(label: str) -> str:
     """Return RGB string of color for given standard psp label"""
@@ -40,18 +53,7 @@ def delta_measure_hist(pseudos: dict, measure_type):
 
     px = 1 / plt.rcParams["figure.dpi"]  # pixel in inches
     fig, ax = plt.subplots(1, 1, figsize=(1024 * px, 360 * px))
-    configurations = [
-        "BCC",
-        "FCC",
-        "SC",
-        "Diamond",
-        "XO",
-        "X2O",
-        "XO3",
-        "X2O",
-        "X2O3",
-        "X2O5",
-    ]
+    configurations = CONFIGURATIONS
     num_configurations = len(configurations)
 
     # element
@@ -115,14 +117,11 @@ def convergence(pseudos: dict, wf_name, measure_name, ylabel, threshold=None):
 
     for label, output in pseudos.items():
         # Calculate the avg delta measure value
-        structures = ["X", "XO", "X2O", "XO3", "X2O", "X2O3", "X2O5"]
         lst = []
-        for structure in structures:
+        for configuration in CONFIGURATIONS:
             try:
-                res = output["delta_measure"]["output_delta_analyze"][
-                    f"output_{structure}"
-                ]
-                lst.append(res["rel_errors_vec_length"])
+                res = output["delta_measure"]["output_parameters"][f"{configuration}"]
+                lst.append(res["nu"])
             except Exception:
                 pass
 
