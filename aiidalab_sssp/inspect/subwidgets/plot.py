@@ -28,19 +28,19 @@ class PlotDeltaMeasureWidget(ipw.VBox):
 
     @traitlets.observe("selected_pseudos")
     def _on_pseudos_change(self, change):
-        out_nv_delta = ipw.Output()
+        out_nu = ipw.Output()
         out_delta = ipw.Output()
 
         if change["new"]:
-            with out_nv_delta:
-                fig = delta_measure_hist(change["new"], "nv_delta")
+            with out_nu:
+                fig = delta_measure_hist(change["new"], "nu")
                 display(fig)
 
             with out_delta:
                 fig = delta_measure_hist(change["new"], "delta")
                 display(fig)
 
-        children = [out_nv_delta, out_delta]
+        children = [out_nu, out_delta]
         self.measure_tab.children = children
 
 

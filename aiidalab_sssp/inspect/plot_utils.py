@@ -6,24 +6,27 @@ import numpy as np
 
 def cmap(label: str) -> str:
     """Return RGB string of color for given standard psp label"""
-    _, pp_family, pp_z, pp_type, pp_version = label.split("/")
+    _, psp_type, psp_z, psp_family, psp_version = label.split("/")
 
-    if pp_family == "sg15" and pp_version == "v1.0":
+    if psp_family == "sg15" and psp_version == "v1.2-o2":
         return "#000000"
 
-    if pp_family == "sg15" and pp_version == "v1.2":
+    if psp_family == "sg15" and psp_version == "v1.2-o4":
         return "#708090"
 
-    if pp_family == "gbrv" and pp_version == "v1":
+    if psp_family == "gbrv" and psp_version == "v1":
         return "#4682B4"
 
-    if pp_family == "psl" and pp_version == "v1.0.0" and pp_type == "us":
+    if psp_family == "psl" and psp_version == "v1.0.0" and psp_type == "us":
         return "#F50E02"
 
-    if pp_family == "psl" and pp_version == "v1.0.0" and pp_type == "paw":
-        return "#2D8B00F"
+    if psp_family == "psl" and psp_version == "v1.0.0" and psp_type == "paw":
+        return "#008B00"
 
-    if pp_family == "dojo" and pp_version == "v04":
+    if psp_family == "psl" and psp_version == "v0.1" and psp_type == "paw":
+        return "#FF00FF"
+
+    if psp_family == "dojo" and psp_version == "v04":
         return "#F9A501"
 
     # TODO: more mapping
@@ -37,11 +40,23 @@ def delta_measure_hist(pseudos: dict, measure_type):
 
     px = 1 / plt.rcParams["figure.dpi"]  # pixel in inches
     fig, ax = plt.subplots(1, 1, figsize=(1024 * px, 360 * px))
-    structures = ["X", "XO", "X2O", "XO3", "X2O", "X2O3", "X2O5"]
-    num_structures = len(structures)
+    configurations = [
+        "BCC",
+        "FCC",
+        "SC",
+        "Diamond",
+        "XO",
+        "X2O",
+        "XO3",
+        "X2O",
+        "X2O3",
+        "X2O5",
+    ]
+    num_configurations = len(configurations)
 
     # element
     try:
+        # Since the element are same for all, use first one
         v0 = list(pseudos.values())[0]
         element = v0["pseudo_info"]["element"]
     except Exception:
@@ -50,27 +65,24 @@ def delta_measure_hist(pseudos: dict, measure_type):
     if measure_type == "delta":
         keyname = "delta"
         ylabel = "Δ -factor"
-    elif measure_type == "nv_delta":
-        keyname = "rel_errors_vec_length"
+    elif measure_type == "nu":
+        keyname = "nu"
         ylabel = "ν -factor"
 
     for i, (label, output) in enumerate(pseudos.items()):
-        N = len(structures)
-        idx = np.arange(N)  # the x locations for the groups
+        idx = np.arange(num_configurations)  # the x locations for the groups
         width = 0.1  # the width of the bars
 
         y_delta = []
-        for structure in structures:
+        for configuration in configurations:
             try:
-                res = output["delta_measure"]["output_delta_analyze"][
-                    f"output_{structure}"
-                ]
+                res = output["delta_measure"]["output_parameters"][f"{configuration}"]
                 y_delta.append(res[keyname])
             except Exception:
                 y_delta.append(-1)
 
-        _, pp_family, pp_z, pp_type, pp_version = label.split("/")
-        out_label = f"{pp_z}/{pp_type}({pp_family}-{pp_version})"
+        _, psp_type, psp_z, psp_family, psp_version = label.split("/")
+        out_label = f"{psp_z}/{psp_type}({psp_family}-{psp_version})"
 
         ax.bar(
             idx + width * i,
@@ -88,8 +100,8 @@ def delta_measure_hist(pseudos: dict, measure_type):
     ax.set_ylabel(ylabel)
     ax.set_ylim([0, 10])
     ax.set_yticks(np.arange(10))
-    ax.set_xticks(list(range(num_structures)))
-    ax.set_xticklabels(structures)
+    ax.set_xticks(list(range(num_configurations)))
+    ax.set_xticklabels(configurations)
 
     return fig
 
