@@ -2,10 +2,13 @@
 # Default builder parameters for the SsspAppWorkChain
 
 ## Properties
-delta_run: true
-conv_cohesive_run: true
-conv_phonon_run: true
-conv_pressure_run: true
+delta_measure: true
+bands_measure: true
+cohesive_energy_convergence: true
+phonon_frequencies_convergence: true
+pressure_convergence: true
+delta_convergence: true
+bands_convergence: true
 
 ## Codes
 ph_code: ph-6.7@localhost

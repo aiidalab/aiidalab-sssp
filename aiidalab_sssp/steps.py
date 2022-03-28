@@ -12,7 +12,6 @@ from aiida.plugins import DataFactory, WorkflowFactory
 from aiida_sssp_workflow.utils import helper_parse_upf
 from aiida_sssp_workflow.workflows.verifications import DEFAULT_PROPERTIES_LIST
 from aiidalab_widgets_base import (
-    CodeDropdown,
     ComputationalResourcesWidget,
     ProcessMonitor,
     ProcessNodesTreeWidget,
@@ -180,45 +179,75 @@ class WorkChainSettings(ipw.VBox):
 
     def __init__(self, **kwargs):
 
-        self.delta_run = ipw.Checkbox(
+        # Accuracy properties
+        self.delta_measure = ipw.Checkbox(
             description="",
             tooltip="Calculate the delta measure w.r.t AE.",
             indent=False,
             value=True,
             layout=ipw.Layout(max_width="10%"),
         )
-        self.conv_cohesive_run = ipw.Checkbox(
+        self.bands_measure = ipw.Checkbox(
+            description="",
+            tooltip="Calculate the bands measure for bands distance and bandstructure.",
+            indent=False,
+            value=True,
+            layout=ipw.Layout(max_width="10%"),
+        )
+
+        self.delta_measure.observe(self._update_properties_list, "value")
+        self.bands_measure.observe(self._update_properties_list, "value")
+
+        # Convergenece properties
+        self.cohesive_energy_convergence = ipw.Checkbox(
             description="",
             tooltip="Convergence test on cohesive energy.",
             indent=False,
             value=True,
             layout=ipw.Layout(max_width="10%"),
         )
-        self.conv_pressure_run = ipw.Checkbox(
+        self.pressure_convergence = ipw.Checkbox(
             description="",
             tooltip="Convergence test on pressue.",
             indent=False,
             value=True,
             layout=ipw.Layout(max_width="10%"),
         )
-        self.conv_phonon_run = ipw.Checkbox(
+        self.phonon_frequencies_convergence = ipw.Checkbox(
             description="",
-            tooltip="Convergence test on phonon.",
+            tooltip="Convergence test on phonon frequencies.",
+            indent=False,
+            value=True,
+            layout=ipw.Layout(max_width="10%"),
+        )
+        self.delta_convergence = ipw.Checkbox(
+            description="",
+            tooltip="Convergence test on delta factor.",
+            indent=False,
+            value=True,
+            layout=ipw.Layout(max_width="10%"),
+        )
+        self.bands_convergence = ipw.Checkbox(
+            description="",
+            tooltip="Convergence test on bands distance.",
             indent=False,
             value=True,
             layout=ipw.Layout(max_width="10%"),
         )
 
-        self.delta_run.observe(self._update_properties_list, "value")
-        self.conv_cohesive_run.observe(self._update_properties_list, "value")
-        self.conv_pressure_run.observe(self._update_properties_list, "value")
-        self.conv_phonon_run.observe(self._update_properties_list, "value")
+        self.cohesive_energy_convergence.observe(self._update_properties_list, "value")
+        self.pressure_convergence.observe(self._update_properties_list, "value")
+        self.phonon_frequencies_convergence.observe(
+            self._update_properties_list, "value"
+        )
+        self.delta_convergence.observe(self._update_properties_list, "value")
+        self.bands_convergence.observe(self._update_properties_list, "value")
 
         self.properties_list = DEFAULT_PROPERTIES_LIST
 
         # Work chain protocol
         self.protocol = ipw.ToggleButtons(
-            options=["theos", "test"],
+            options=["theos", "demo"],
             value="theos",
         )
 
@@ -236,26 +265,47 @@ class WorkChainSettings(ipw.VBox):
 
         super().__init__(
             children=[
-                ipw.HTML("Select which properties to verified:"),
-                ipw.HBox(children=[ipw.HTML("<b>Delta measure</b>"), self.delta_run]),
+                ipw.HTML("Properties to verified - For accuracy of pseudopotential:"),
+                ipw.HBox(
+                    children=[ipw.HTML("<b>Delta measure</b>"), self.delta_measure]
+                ),
+                ipw.HBox(
+                    children=[ipw.HTML("<b>Bands measure</b>"), self.bands_measure]
+                ),
+                ipw.HTML(
+                    "Properties to verified - For convergence of pseudopotential:"
+                ),
                 ipw.HBox(
                     children=[
                         ipw.HTML("<b>Convergence: cohesive energy</b>"),
-                        self.conv_cohesive_run,
+                        self.cohesive_energy_convergence,
                     ]
                 ),
                 ipw.HBox(
                     children=[
                         ipw.HTML("<b>Convergence: phonon frequencies</b>"),
-                        self.conv_phonon_run,
+                        self.phonon_frequencies_convergence,
                     ]
                 ),
                 ipw.HBox(
                     children=[
                         ipw.HTML("<b>Convergence: pressure</b>"),
-                        self.conv_pressure_run,
+                        self.pressure_convergence,
                     ]
                 ),
+                ipw.HBox(
+                    children=[
+                        ipw.HTML("<b>Convergence: delta</b>"),
+                        self.delta_convergence,
+                    ]
+                ),
+                ipw.HBox(
+                    children=[
+                        ipw.HTML("<b>Convergence: bands</b>"),
+                        self.bands_convergence,
+                    ]
+                ),
+                # protocol setup
                 ipw.HTML(
                     "Select protocol:",
                     layout=ipw.Layout(flex="1 1 auto"),
@@ -278,17 +328,26 @@ class WorkChainSettings(ipw.VBox):
 
     def _update_properties_list(self, _):
         lst = []
-        if self.delta_run.value:
-            lst.append("delta_measure")
+        if self.delta_measure.value:
+            lst.append("accuracy:delta")
 
-        if self.conv_cohesive_run.value:
+        if self.bands_measure.value:
+            lst.append("accuracy:bands")
+
+        if self.cohesive_energy_convergence.value:
             lst.append("convergence:cohesive_energy")
 
-        if self.conv_phonon_run.value:
+        if self.phonon_frequencies_convergence.value:
             lst.append("convergence:phonon_frequencies")
 
-        if self.conv_pressure_run.value:
+        if self.pressure_convergence.value:
             lst.append("convergence:pressure")
+
+        if self.delta_convergence.value:
+            lst.append("convergence:delta")
+
+        if self.bands_convergence.value:
+            lst.append("convergence:bands")
 
         self.properties_list = lst
 
@@ -301,8 +360,19 @@ class ConfigureSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
 
     def __init__(self, **kwargs):
         self.workchain_settings = WorkChainSettings()
-        self.workchain_settings.delta_run.observe(self._update_state, "value")
-        self.workchain_settings.conv_cohesive_run.observe(self._update_state, "value")
+        self.workchain_settings.delta_measure.observe(self._update_state, "value")
+        self.workchain_settings.bands_measure.observe(self._update_state, "value")
+        self.workchain_settings.cohesive_energy_convergence.observe(
+            self._update_state, "value"
+        )
+        self.workchain_settings.phonon_frequencies_convergence.observe(
+            self._update_state, "value"
+        )
+        self.workchain_settings.pressure_convergence.observe(
+            self._update_state, "value"
+        )
+        self.workchain_settings.bands_convergence.observe(self._update_state, "value")
+        self.workchain_settings.delta_convergence.observe(self._update_state, "value")
 
         self._submission_blocker_messages = ipw.HTML()
 
@@ -334,15 +404,22 @@ class ConfigureSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
         """Set the inputs in the GUI based on a set of parameters."""
         with self.hold_trait_notifications():
             # Wor chain settings
-            self.workchain_settings.delta_run.value = parameters["delta_run"]
-            self.workchain_settings.conv_cohesive_run.value = parameters[
-                "conv_cohesive_run"
+            self.workchain_settings.delta_measure.value = parameters["delta_measure"]
+            self.workchain_settings.bands_measure.value = parameters["bands_measure"]
+            self.workchain_settings.cohesive_energy_convergence.value = parameters[
+                "cohesive_energy_convergence"
             ]
-            self.workchain_settings.conv_phonon_run.value = parameters[
-                "conv_phonon_run"
+            self.workchain_settings.phonon_frequencies_convergence.value = parameters[
+                "phonon_frequencies_convergence"
             ]
-            self.workchain_settings.conv_pressure_run.value = parameters[
-                "conv_pressure_run"
+            self.workchain_settings.pressure_convergence.value = parameters[
+                "pressure_convergence"
+            ]
+            self.workchain_settings.delta_convergence.value = parameters[
+                "delta_convergence"
+            ]
+            self.workchain_settings.bands_convergence.value = parameters[
+                "bands_convergence"
             ]
             self.workchain_settings.protocol.value = parameters["protocol"]
             self.workchain_settings.criteria.value = parameters["criteria"]
@@ -352,8 +429,13 @@ class ConfigureSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
         if self.previous_step_state == self.State.SUCCESS:
             self.confirm_button.disabled = False
             if not (
-                self.workchain_settings.delta_run.value
-                or self.workchain_settings.conv_cohesive_run.value
+                self.workchain_settings.delta_measure.value
+                or self.workchain_settings.bands_measure.value
+                or self.workchain_settings.cohesive_energy_convergence.value
+                or self.workchain_settings.phonon_frequencies_convergence.value
+                or self.workchain_settings.pressure_convergence.value
+                or self.workchain_settings.delta_convergence.value
+                or self.workchain_settings.bands_convergence.value
             ):
                 self.confirm_button.disabled = True
                 self.state = self.State.READY
@@ -549,55 +631,6 @@ class SettingPseudoMetadataStep(ipw.VBox, WizardAppWidgetStep):
         self.title.value = ""
 
 
-class CodeSettings(ipw.VBox):
-
-    codes_title = ipw.HTML(
-        """<div style="padding-top: 0px; padding-bottom: 0px">
-        <h4>Codes</h4></div>"""
-    )
-    codes_help = ipw.HTML(
-        """<div style="line-height: 140%; padding-top: 0px; padding-bottom:
-        10px"> Select the code to use for running the calculations. The codes
-        on the local machine (localhost) are installed by default, but you can
-        configure new ones on potentially more powerful machines by clicking on
-        "Setup new code".</div>"""
-    )
-
-    def __init__(self, **kwargs):
-
-        self.pw = CodeDropdown(
-            input_plugin="quantumespresso.pw",
-            description="pw.x:",
-            setup_code_params={
-                "computer": "localhost",
-                "description": "pw.x in AiiDAlab container.",
-                "label": "pw",
-                "input_plugin": "quantumespresso.pw",
-                "remote_abs_path": "/usr/bin/pw.x",
-            },
-        )
-        self.ph = CodeDropdown(
-            input_plugin="quantumespresso.ph",
-            description="ph.x:",
-            setup_code_params={
-                "computer": "localhost",
-                "description": "ph.x in AiiDAlab container.",
-                "label": "ph",
-                "input_plugin": "quantumespresso.ph",
-                "remote_abs_path": "/usr/bin/ph.x",
-            },
-        )
-        super().__init__(
-            children=[
-                self.codes_title,
-                self.codes_help,
-                self.pw,
-                self.ph,
-            ],
-            **kwargs,
-        )
-
-
 class ResourceSelectionWidget(ipw.VBox):
     """Widget for the selection of compute resources."""
 
@@ -712,7 +745,10 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
         self._submission_blocker_messages = ipw.HTML("")
 
         self.pw_code.observe(self._update_state, "value")
+        self.pw_code.observe(self._update_resources, "value")
+
         self.ph_code.observe(self._update_state, "value")
+        self.ph_code.observe(self._update_resources, "value")
 
         self.resources_config = ResourceSelectionWidget()
         self.parallelization = ParallelizationSettings()
@@ -765,6 +801,13 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
             )
             self.submit_button.disabled = change["new"] != self.State.CONFIGURED
 
+    def _update_resources(self, change):
+        if change["new"] and (
+            change["old"] is None
+            or change["new"].computer.pk != change["old"].computer.pk
+        ):
+            self.set_resource_defaults(change["new"].computer)
+
     def set_resource_defaults(self, computer=None):
 
         if computer is None or computer.hostname == "localhost":
@@ -780,7 +823,7 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
             self.resources_config.num_cpus.max = default_mpiprocs
             self.resources_config.num_cpus.value = default_mpiprocs
             self.resources_config.num_cpus.description = "CPUs/node"
-            self.parallelization.npools.value = self._get_default_parallelization()
+            # self.parallelization.npools.value = self._get_default_parallelization()
 
         # self._check_resources()
 
@@ -841,7 +884,7 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
         builder.protocol = orm.Str(self.workchain_settings.protocol.value)
         builder.criteria = orm.Str(self.workchain_settings.criteria.value)
         builder.cutoff_control = (
-            orm.Str("test")  # FIXME test only for dev, should be `local` in production
+            orm.Str("demo")  # FIXME demo only for dev, should be `quick` in production
             if self.workchain_settings.quick_run.value
             else orm.Str("cluster")
         )
@@ -860,31 +903,32 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
         )
         builder.clean_workdir_level = orm.Int(9)  # anyway clean all
 
-        self.process = submit(builder)
-
         # set extras for easy query and comprehensive show results
         header = helper_parse_upf(self.pseudo)
 
         element = self.pseudo.element
         psp_type = header.get("pseudo_type", None)
-        psp_family = (self.metadata_settings.psp_family.value,)
-        psp_version = (self.metadata_settings.psp_version.value,)
-        psp_extra_label = (self.metadata_settings.psp_extra_label.value,)
-        extras = {
-            "element": element,
-            "psp_type": psp_type,
-            "psp_family": psp_family,
-            "psp_version": psp_version,
-        }
+        psp_family = self.metadata_settings.psp_family.value
+        psp_version = self.metadata_settings.psp_version.value
+        psp_extra_label = self.metadata_settings.psp_extra_label.value
         label = (
             f"{element}/z={self.pseudo.z_valence}/{psp_type}/{psp_family}/{psp_version}"
         )
-
         if psp_extra_label:
             label += f"/{psp_extra_label}"
 
-        extras["psp_label"] = label
-        self.process.set_extra_many(extras)
+        builder.label = orm.Str(label)
+
+        # print("properties_list:", builder.properties_list.get_list())
+        # print("protocol:", builder.protocol.value)
+        # print("criteria:", builder.criteria.value)
+        # print("cutoff_control:", builder.cutoff_control.value)
+        # print("options:", builder.options.get_dict())
+        # print("parallelization:", builder.parallelization.get_dict())
+        # print("clean_workdir_level:", builder.clean_workdir_level.value)
+        # print("label:", builder.label.value)
+
+        self.process = submit(builder)
 
         self.process.description = self.metadata_settings.description.value
 
