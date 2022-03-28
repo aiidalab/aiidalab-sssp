@@ -85,7 +85,7 @@ class SelectMultipleCheckbox(ipw.VBox):
     @staticmethod
     def _parse_desc(desc):
         """parse the label to more explainable line"""
-        _, psp_type, psp_z, psp_family, psp_version = desc.split("/")
+        _, psp_type, psp_z, psp_family, psp_version = desc.split("/")[0:5]
         if psp_type == "nc":
             psp_type = "Norm-conserving"
         if psp_type == "us":
@@ -96,7 +96,7 @@ class SelectMultipleCheckbox(ipw.VBox):
         if psp_family == "psl":
             psp_family = "PSlibrary"
         if psp_family == "dojo":
-            psp_family = "Pseudo-DOJO"
+            psp_family = "DOJO"
         if psp_family == "sg15":
             psp_family = "SG15"
 
@@ -106,6 +106,7 @@ class SelectMultipleCheckbox(ipw.VBox):
 
 
 class PseudoSelectWidget(ipw.VBox):
+    pseudos_dict = traitlets.Dict(allow_none=True)
     selected_element = traitlets.Unicode(allow_none=True)
     selected_pseudos = traitlets.Dict(allow_none=True)
 
@@ -119,9 +120,6 @@ class PseudoSelectWidget(ipw.VBox):
         self.multi_select_widget.observe(
             self._on_multi_select_widget_change, names="value"
         )
-
-        # have a dict store all pseudos and their results
-        self.pseudos_dict = dict()
 
         super().__init__(
             children=[
@@ -149,7 +147,13 @@ class PseudoSelectWidget(ipw.VBox):
         self.selected_pseudos = self.pseudos_dict
 
     def _on_multi_select_widget_change(self, change):
-        selected_pseudos = dict()
+        pseudos = dict()
         for pseudo in change["new"]:
-            selected_pseudos[pseudo] = self.pseudos_dict[pseudo]
-        self.selected_pseudos = selected_pseudos
+            pseudos[pseudo] = self.pseudos_dict[pseudo]
+        self.selected_pseudos = pseudos
+
+    @traitlets.observe("pseudos_dict")
+    def _observe_selected_pseudos(self, _):
+        self.multi_select_widget.options = (
+            tuple(self.pseudos_dict.keys()) if self.pseudos_dict else tuple()
+        )

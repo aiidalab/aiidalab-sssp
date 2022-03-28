@@ -19,7 +19,7 @@ CONFIGURATIONS = [
 
 def cmap(label: str) -> str:
     """Return RGB string of color for given standard psp label"""
-    _, psp_type, psp_z, psp_family, psp_version = label.split("/")
+    _, psp_type, psp_z, psp_family, psp_version = label.split("/")[0:5]
 
     if psp_family == "sg15" and psp_version == "v1.2-o2":
         return "#000000"
@@ -39,7 +39,7 @@ def cmap(label: str) -> str:
     if psp_family == "psl" and psp_version == "v0.1" and psp_type == "paw":
         return "#FF00FF"
 
-    if psp_family == "dojo" and psp_version == "v04":
+    if psp_family == "dojo":
         return "#F9A501"
 
     # TODO: more mapping
@@ -83,7 +83,7 @@ def delta_measure_hist(pseudos: dict, measure_type):
             except Exception:
                 y_delta.append(-1)
 
-        _, psp_type, psp_z, psp_family, psp_version = label.split("/")
+        _, psp_type, psp_z, psp_family, psp_version = label.split("/")[0:5]
         out_label = f"{psp_z}/{psp_type}({psp_family}-{psp_version})"
 
         ax.bar(
@@ -137,7 +137,7 @@ def convergence(pseudos: dict, wf_name, measure_name, ylabel, threshold=None):
 
             wfc_cutoff = res["final_output_parameters"]["wfc_cutoff"]
 
-            _, pp_family, pp_z, pp_type, pp_version = label.split("/")
+            _, pp_family, pp_z, pp_type, pp_version = label.split("/")[0:5]
             out_label = f"{pp_z}/{pp_type}(ν={avg_delta:.2f})({pp_family}-{pp_version})"
 
             ax1.plot(x_wfc, y_wfc, marker="o", color=cmap(label), label=out_label)
@@ -149,7 +149,7 @@ def convergence(pseudos: dict, wf_name, measure_name, ylabel, threshold=None):
                 label=f"cutoff wfc = {wfc_cutoff} Ry",
             )
         except Exception:
-            pass
+            raise
 
     ax1.set_ylabel(ylabel)
     ax1.set_xlabel("Wavefuntion cutoff (Ry)")

@@ -67,10 +67,10 @@ class _PlotConvergenBaseWidget(ipw.VBox):
 
     @traitlets.observe("selected_pseudos")
     def _on_pseudos_change(self, change):
-        with self.output:
-            clear_output(wait=True)
 
-            if change["new"]:
+        if change["new"]:
+            with self.output:
+                clear_output(wait=True)
                 fig = convergence(
                     change["new"],
                     wf_name=self._WF,

@@ -911,9 +911,7 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
         psp_family = self.metadata_settings.psp_family.value
         psp_version = self.metadata_settings.psp_version.value
         psp_extra_label = self.metadata_settings.psp_extra_label.value
-        label = (
-            f"{element}/z={self.pseudo.z_valence}/{psp_type}/{psp_family}/{psp_version}"
-        )
+        label = f"{element.lower()}/{psp_type.lower()}/z={self.pseudo.z_valence}/{psp_family.lower()}/{psp_version}"
         if psp_extra_label:
             label += f"/{psp_extra_label}"
 
