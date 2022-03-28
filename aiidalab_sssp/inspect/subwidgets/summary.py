@@ -1,6 +1,20 @@
 import ipywidgets as ipw
+import pandas as pd
 import traitlets
-from IPython.display import clear_output
+from IPython.display import clear_output, display
+
+CONFIGURATIONS = [
+    "BCC",
+    "FCC",
+    "SC",
+    "Diamond",
+    "XO",
+    "X2O",
+    "XO3",
+    "X2O",
+    "X2O3",
+    "X2O5",
+]
 
 
 class SummaryWidget(ipw.VBox):
@@ -24,23 +38,63 @@ class SummaryWidget(ipw.VBox):
             with self.output:
                 clear_output(wait=True)
 
-                print_summary(change["new"])
+                display(pd_summary_table(change["new"]))
 
 
-def print_summary(pseudos: dict):
+def pd_summary_table(pseudos: dict):
 
-    print("Label\t\t\t|Cohesive energy|\t|Phonon frequencies|\t|Pressure|")
+    rows = []
     for label, output in pseudos.items():
         try:
-            res_coh = output["convergence_cohesive_energy"]["final_output_parameters"]
-            res_phonon = output["convergence_phonon_frequencies"][
+            lst = []
+            for configuration in CONFIGURATIONS:
+                try:
+                    res = output["delta_measure"]["output_parameters"][
+                        f"{configuration}"
+                    ]
+                    lst.append(res["nu"])
+                except Exception:
+                    pass
+
+            avg_delta = sum(lst) / len(lst)
+
+            cohesive_energy = output["convergence_cohesive_energy"][
                 "final_output_parameters"
             ]
-            res_pressure = output["convergence_pressure"]["final_output_parameters"]
-            print(
-                f'{label}\t({res_coh["wfc_cutoff"]}, {res_coh["rho_cutoff"]:.2f})'
-                f'\t({res_phonon["wfc_cutoff"]}, {res_phonon["rho_cutoff"]:.2f})'
-                f'\t({res_pressure["wfc_cutoff"]}, {res_pressure["rho_cutoff"]:.2f})'
+            phonon_frequencies = output["convergence_phonon_frequencies"][
+                "final_output_parameters"
+            ]
+            pressure = output["convergence_pressure"]["final_output_parameters"]
+            bands = output["convergence_bands"]["final_output_parameters"]
+            delta = output["convergence_delta"]["final_output_parameters"]
+
+            rows.append(
+                [
+                    label,
+                    (cohesive_energy["wfc_cutoff"], cohesive_energy["rho_cutoff"]),
+                    (
+                        phonon_frequencies["wfc_cutoff"],
+                        phonon_frequencies["rho_cutoff"],
+                    ),
+                    (pressure["wfc_cutoff"], pressure["rho_cutoff"]),
+                    (delta["wfc_cutoff"], delta["rho_cutoff"]),
+                    (bands["wfc_cutoff"], bands["rho_cutoff"]),
+                    avg_delta,
+                ]
             )
+
         except Exception as e:
             raise e
+
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "label",
+            "cohesive energy",
+            "phonon frequencies",
+            "pressure",
+            "delta",
+            "bands",
+            "ν avg.",
+        ],
+    )
