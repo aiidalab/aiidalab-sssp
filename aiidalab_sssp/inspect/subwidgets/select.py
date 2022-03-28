@@ -5,14 +5,17 @@ import traitlets
 
 # the mock db is a folder which contains pseudos in the sub-folders named by element seprately.
 # This should be some lightweight database constructed from SSSP web page and local-run aiida postgresql database
-SSSP_DB = {
-    "Au": "https://raw.githubusercontent.com/unkcpz/sssp-verify-scripts/sg15-check/result_json/Au.json",
-    "Te": "https://raw.githubusercontent.com/unkcpz/sssp-verify-scripts/sg15-check/result_json/Te.json",
-    "Na": "https://raw.githubusercontent.com/unkcpz/sssp-verify-scripts/sg15-check/result_json/Na.json",
+SSSP_JSON = {
+    "Mg": "https://raw.githubusercontent.com/unkcpz/sssp-verify-scripts/demo_results/results/Mg.json",
+    "Si": "https://raw.githubusercontent.com/unkcpz/sssp-verify-scripts/demo_results/results/Si.json",
+}
+SSSP_ARCHIVE = {
+    "Mg": "https://raw.githubusercontent.com/unkcpz/sssp-verify-scripts/demo_results/results/Mg.aiida",
+    "Si": "https://raw.githubusercontent.com/unkcpz/sssp-verify-scripts/demo_results/results/Si.aiida",
 }
 
 
-def _load_pseudos_from_db(db, element):
+def _load_pseudos_from_json(db, element):
     from urllib import request
 
     pseudos_url = db.get(element, None)
@@ -82,18 +85,22 @@ class SelectMultipleCheckbox(ipw.VBox):
     @staticmethod
     def _parse_desc(desc):
         """parse the label to more explainable line"""
-        _, pp_family, pp_z, pp_type, pp_version = desc.split("/")
-        if pp_type == "nc":
-            pp_type = "Norm-conserving"
-        if pp_type == "us":
-            pp_type = "Ultrasoft"
-        if pp_type == "paw":
-            pp_type = "PAW"
+        _, psp_type, psp_z, psp_family, psp_version = desc.split("/")
+        if psp_type == "nc":
+            psp_type = "Norm-conserving"
+        if psp_type == "us":
+            psp_type = "Ultrasoft"
+        if psp_type == "paw":
+            psp_type = "PAW"
 
-        if pp_family == "psl":
-            pp_family = "PSlibrary"
+        if psp_family == "psl":
+            psp_family = "PSlibrary"
+        if psp_family == "dojo":
+            psp_family = "Pseudo-DOJO"
+        if psp_family == "sg15":
+            psp_family = "SG15"
 
-        out_label = f"""{pp_z}\t|\t{pp_type}\t|\t{pp_family}-{pp_version}"""
+        out_label = f"""{psp_z}\t|\t{psp_type}\t|\t{psp_family}-{psp_version}"""
 
         return out_label
 
@@ -130,7 +137,9 @@ class PseudoSelectWidget(ipw.VBox):
             self.help_info.value = f"Please choose pseudopotentials of element {self.selected_element} to inspect:"
 
         if self.selected_element:
-            self.pseudos_dict = _load_pseudos_from_db(SSSP_DB, self.selected_element)
+            self.pseudos_dict = _load_pseudos_from_json(
+                SSSP_JSON, self.selected_element
+            )
 
         self.multi_select_widget.options = (
             tuple(self.pseudos_dict.keys()) if self.pseudos_dict else tuple()
