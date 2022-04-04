@@ -102,7 +102,7 @@ class PlotPhononFrequenciesConvergeAbsWidget(_PlotConvergenBaseWidget):
 
     _WF = "convergence_phonon_frequencies"
     _MEASURE = "absolute_diff"
-    _YLABEL = "Phonon frequencies ω (absolute error, %)"
+    _YLABEL = "Phonon frequencies ω (absolute error, cm-1)"
     _THRESHOLD = None
 
 
