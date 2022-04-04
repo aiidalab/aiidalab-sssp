@@ -71,7 +71,7 @@ def chess_compare(pseudos):
     element = list(pseudos.values())[0]["pseudo_info"]["element"]
     is_metal = element not in NONMETAL_ELEMENTS
 
-    fermi_shift = 5  # eV in protocol FIXME
+    fermi_shift = 10  # eV in protocol FIXME also change title of plot Tab widget
 
     arr_lst_c = []
     arr_lst_v = []
@@ -126,7 +126,9 @@ class BandsWidget(ipw.VBox):
     def __init__(self):
         self.bands_out = ipw.Output()
         self.select = ipw.Dropdown()
-        self.chess_out = ipw.Output()
+        self.chess_tab = ipw.Tab(children=[ipw.Output(), ipw.Output()])
+        self.chess_tab.set_title(0, "Valence only")
+        self.chess_tab.set_title(1, "Conductor shift 10eV")
 
         self.select.observe(self._on_select, names="value")
 
@@ -138,7 +140,7 @@ class BandsWidget(ipw.VBox):
                 ipw.HTML(
                     "Bands distance, upper triangle->eta, lower->max_diff"
                 ),  # FIXME recheck
-                self.chess_out,
+                self.chess_tab,
             ],
         )
 
@@ -148,12 +150,18 @@ class BandsWidget(ipw.VBox):
             self.select.options = [i for i in self.selected_pseudos.keys()]
             labels, cross_arr_c, cross_arr_v = chess_compare(change["new"])
 
-            fig = bands_chess(labels, cross_arr_c, cross_arr_v)
+            fig_conductor = bands_chess(labels, cross_arr_c, "conduct bands")
+            fig_valence = bands_chess(labels, cross_arr_v, "valence bands")
 
-            with self.chess_out:
+            with self.chess_tab.children[0]:
                 clear_output()
-                fig.canvas.header_visible = False
-                display(fig.canvas)
+                fig_valence.canvas.header_visible = False
+                display(fig_valence.canvas)
+
+            with self.chess_tab.children[1]:
+                clear_output()
+                fig_conductor.canvas.header_visible = False
+                display(fig_conductor.canvas)
 
     def _on_select(self, change):
 

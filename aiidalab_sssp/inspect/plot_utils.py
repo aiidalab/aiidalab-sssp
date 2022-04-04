@@ -176,43 +176,38 @@ def convergence(pseudos: dict, wf_name, measure_name, ylabel, threshold=None):
     return fig
 
 
-def bands_chess(labels, cross_arr_c, cross_arr_v):
+def bands_chess(labels, arr, title):
 
     px = 1 / plt.rcParams["figure.dpi"]
-    fig, axs = plt.subplots(1, 2, figsize=(960 * px, 360 * px))
+    fig, ax = plt.subplots(1, 1, figsize=(960 * px, 960 * px))
 
-    for idx, (arr, ax) in enumerate(zip([cross_arr_c, cross_arr_v], axs)):
-        ax.imshow(arr)
+    ax.imshow(arr)
 
-        # Show all ticks and label them with the respective list entries
-        # We want to show all ticks...
-        ax.set_xticks(np.arange(len(labels)))
-        ax.set_yticks(np.arange(len(labels)))
-        # ... and label them with the respective list entries
-        ax.set_xticklabels(labels)
-        ax.set_yticklabels(labels)
+    # Show all ticks and label them with the respective list entries
+    # We want to show all ticks...
+    ax.set_xticks(np.arange(len(labels)))
+    ax.set_yticks(np.arange(len(labels)))
+    # ... and label them with the respective list entries
+    ax.set_xticklabels(labels)
+    ax.set_yticklabels(labels)
 
-        # Rotate the tick labels and set their alignment.
-        plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+    # Rotate the tick labels and set their alignment.
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
 
-        # Loop over data dimensions and create text annotations.
-        for i in range(len(labels)):
-            for j in range(len(labels)):
-                ax.text(
-                    j,
-                    i,
-                    np.around(arr[i, j], decimals=3),
-                    ha="center",
-                    va="center",
-                    color="w",
-                )
+    # Loop over data dimensions and create text annotations.
+    for i in range(len(labels)):
+        for j in range(len(labels)):
+            ax.text(
+                j,
+                i,
+                np.around(arr[i, j], decimals=3),
+                ha="center",
+                va="center",
+                color="w",
+            )
 
-        if idx == 0:  # FIXME recheck
-            # conduction
-            ax.set_title("bands distance (with conduction bands)")
-        else:
-            # valence
-            ax.set_title("bands distance (only valence bands)")
+    ax.set_title(title)
+
     fig.tight_layout()
 
     return fig
