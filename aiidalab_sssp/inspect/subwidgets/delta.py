@@ -1,104 +1,97 @@
+"""Moudle contains widgets for accuracy delat results inspect.
+The widget EosWidget for showing Eos fit line of a given pseudo in the given configuration.
+The widget NuMeasure showing Nicola's Nu measure of all pseudos in all configurations"""
+
 import ipywidgets as ipw
 import matplotlib.pyplot as plt
 import numpy as np
 import traitlets
+from aiida_sssp_workflow.utils import OXIDE_CONFIGURATIONS, UNARIE_CONFIGURATIONS
 from IPython.display import clear_output, display
 
+CONFIGURATION = OXIDE_CONFIGURATIONS + UNARIE_CONFIGURATIONS + ["RE", "TYPICAL"]
 
-class EOSwidget(ipw.VBox):
 
-    selected_pseudos = traitlets.Dict(allow_none=True)
+class EosWidget(ipw.VBox):
+
+    pseudos = traitlets.Dict(allow_none=True)
 
     def __init__(self):
-        self.select = ipw.Dropdown()
-        self.select.observe(self._on_select, names="value")
+        self.select_pseudo = ipw.Dropdown()
+        self.select_pseudo.observe(self._on_pseudo_select, names="value")
 
-        self.eos_out = ipw.Output()
+        self.select_configuration = ipw.Dropdown()
+        self.select_configuration.observe(self._on_configuration_selecet, names="value")
+
+        self.eos_preview = ipw.Output()  # empty plot with a instruction ask for select
 
         super().__init__(
             children=[
-                ipw.HTML("EOS w.r.t AE"),
-                self.select,
-                self.eos_out,
+                ipw.HTML("<h2> Equation of State Pseudopotential w.r.t AE </h2>"),
+                ipw.HBox(children=[self.select_pseudo, self.select_configuration]),
+                self.eos_preview,
             ],
         )
 
-    @traitlets.observe("selected_pseudos")
+    @traitlets.observe("pseudos")
     def _on_pseudos_change(self, change):
         if change["new"]:
-            self.select.options = [i for i in self.selected_pseudos.keys()]
+            self.select_pseudo.options = list(self.pseudos.keys())
 
-    def _on_select(self, change):
-
+    def _on_pseudo_select(self, change):
+        """Update configuration dropdown list and select first entity"""
         if change["new"]:
             label = change["new"]
-            pseudo_delta = {}
+            _data = self.pseudos[label]["accuracy"]["delta"]
 
-            for k, v in self.selected_pseudos[label]["delta_measure"].items():
-                if k != "output_parameters":
-                    pseudo_delta[k] = v
-            # pseudo_delta = {k, v for k, v in self.selected_pseudos[label]["delta_measure"].items() if k != 'output_parameters'}
-            # del pseudo_delta["output_parameters"]
+            configuration_list = [i for i in _data.keys() if i in CONFIGURATION]
+            self.select_configuration.options = configuration_list
 
-            fig = pseudo_eos_galary(pseudo_delta)
+            self._render()
 
-            with self.eos_out:
-                clear_output()
-                display(fig.canvas)
+    def _on_configuration_selecet(self, change):
+        """Update eos preview"""
+        if change["new"]:
+            self._render()
 
+    def _render(self):
+        """once called renden with current instance"""
+        output = self.eos_preview
+        label = self.select_pseudo.value
+        configuration = self.select_configuration.value
 
-def get_ax_from_list(pos, axes_list):
-    num_rows = len(axes_list)
-    num_columns = len(axes_list[0])
-    assert num_rows * num_columns == 10
+        data = self.pseudos[label]["accuracy"]["delta"].get(configuration, None)
+        fig, ax = plt.subplots(1, 1)
+        fig.canvas.header_visible = False
+        _render_plot(ax, data=data, configuration=configuration)
 
-    row = pos // 5
-    column = pos % 5
-
-    return axes_list[row, column]
-
-
-def pseudo_eos_galary(delta_measure):
-    """input delta_measure result of a pseudo plot 2x5 grids of EOS"""
-    num_rows = 2
-    num_cols = 5
-
-    px = 1 / plt.rcParams["figure.dpi"]
-    fig, axes_list = plt.subplots(num_rows, num_cols, figsize=(1024 * px, 640 * px))
-
-    for idx, (configuration, res) in enumerate(delta_measure.items()):
-        ax = get_ax_from_list(pos=idx, axes_list=axes_list)
-        _plot_for(
-            ax,
-            configuration,
-            res,
-        )
-
-    return fig
+        with output:
+            clear_output()
+            display(fig.canvas)
 
 
-def _plot_for(ax, configuration, res):
-    volumes = list(res["eos"]["output_volume_energy"]["volumes"].values())
-    energies = list(res["eos"]["output_volume_energy"]["energies"].values())
+def _render_plot(ax, data, configuration):
+    """render preview of eos result"""
+    volumes = data["eos"]["output_volume_energy"]["volumes"]
+    energies = data["eos"]["output_volume_energy"]["energies"]
 
     dense_volume_max = max(volumes)
     dense_volume_min = min(volumes)
 
     dense_volumes = np.linspace(dense_volume_min, dense_volume_max, 100)
 
-    # TODO: in the results now only sample E0 is record, should use AE ref E0
-    E0 = res["eos"]["output_birch_murnaghan_fit"]["energy0"]
-    ref_V0, ref_B0, ref_B01 = res["output_parameters"]["reference_wien2k_V0_B0_B1"]
-    V0, B0, B01 = res["output_parameters"]["birch_murnaghan_results"]
+    E0 = data["eos"]["output_birch_murnaghan_fit"]["energy0"]
+    ref_V0, ref_B0, ref_B01 = data["output_parameters"]["reference_wien2k_V0_B0_B1"]
+    V0, B0, B01 = data["output_parameters"]["birch_murnaghan_results"]
 
-    ref_eos_fit_energy = birch_murnaghan(
+    ae_eos_fit_energy = birch_murnaghan(
         V=dense_volumes,
-        E0=E0,
+        E0=E0,  # in future update E0 from referece json, where ACWF has E0 stored.
         V0=ref_V0,
         B0=ref_B0,
         B01=ref_B01,
     )
-    compare_eos_fit_energy = birch_murnaghan(
+    psp_eos_fit_energy = birch_murnaghan(
         V=dense_volumes,
         E0=E0,
         V0=V0,
@@ -107,15 +100,15 @@ def _plot_for(ax, configuration, res):
     )
 
     # Plot EOS: this will be done anyway
-    ax.plot(volumes, energies, "ob", label="EOS data")
-    ax.plot(dense_volumes, ref_eos_fit_energy, "-b", label="AE WIEN2K fit")
+    ax.plot(volumes, energies, "ob", label="RAW equation of state")
+    ax.plot(dense_volumes, ae_eos_fit_energy, "-b", label="AE WIEN2K")
     ax.axvline(V0, linestyle="--", color="gray")
 
-    ax.plot(dense_volumes, compare_eos_fit_energy, "-r", label=f"{configuration} fit")
+    ax.plot(dense_volumes, psp_eos_fit_energy, "-r", label=f"{configuration} fit")
     ax.fill_between(
         dense_volumes,
-        ref_eos_fit_energy,
-        compare_eos_fit_energy,
+        ae_eos_fit_energy,
+        psp_eos_fit_energy,
         alpha=0.5,
         color="red",
     )

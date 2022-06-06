@@ -7,18 +7,16 @@ import traitlets
 from aiidalab_sssp.inspect import SSSP_DB
 
 
-def _load_pseudo_list(element, db=SSSP_DB) -> list:
-    """Open result json file of element return list of pseudo labels
-    if element is None, return empty list.
-    """
+def _load_pseudos(element, db=SSSP_DB) -> dict:
+    """Open result json file of element return as dict"""
     if element:
         json_fn = os.path.join(db, f"{element}.json")
         with open(json_fn, "r") as fh:
             pseudos = json.load(fh)
 
-        return list(pseudos.keys())
+        return pseudos
 
-    return list()
+    return dict()
 
 
 class SelectMultipleCheckbox(ipw.VBox):
@@ -89,7 +87,7 @@ class SelectMultipleCheckbox(ipw.VBox):
 
 class PseudoSelectWidget(ipw.VBox):
     element = traitlets.Unicode(allow_none=True)
-    selected_pseudos = traitlets.List(allow_none=True)
+    selected_pseudos = traitlets.Dict(allow_none=True)
 
     NO_ELEMENT_INFO = "No element is selected"
 
@@ -118,11 +116,12 @@ class PseudoSelectWidget(ipw.VBox):
             )
 
             # If an element is chosen update checkbox list
-            self.pseudo_list = _load_pseudo_list(self.element)
-            self.multiple_selection.options = self.pseudo_list
+            # self.pseudos store all dict for the element the initial parsed from element json
+            self.pseudos = _load_pseudos(self.element)
+            self.multiple_selection.options = list(self.pseudos.keys())
 
             # select all pseudos of element as default
-            self.selected_pseudos = self.pseudo_list
+            self.selected_pseudos = self.pseudos
 
     def _on_multiple_selection_change(self, change):
-        self.selected_pseudos = change["new"]
+        self.selected_pseudos = {k: self.pseudos[k] for k in change["new"]}
