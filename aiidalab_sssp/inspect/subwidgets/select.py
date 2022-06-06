@@ -4,7 +4,7 @@ import os
 import ipywidgets as ipw
 import traitlets
 
-from aiidalab_sssp.inspect import SSSP_DB
+from aiidalab_sssp.inspect import SSSP_DB, parse_label
 
 
 def _load_pseudos(element, db=SSSP_DB) -> dict:
@@ -56,7 +56,7 @@ class SelectMultipleCheckbox(ipw.VBox):
         # when options list (element rechoose) change update all checkboxes
         self.checkbox_dict = {
             f"{desc}": ipw.Checkbox(
-                description=self._parse_description(desc),
+                description=parse_label(desc)["representive_label"],
                 value=self.tick_all,
                 style={"description_width": "initial"},
             )
@@ -64,25 +64,6 @@ class SelectMultipleCheckbox(ipw.VBox):
         }
 
         self._update_checkbox_group()
-
-    @staticmethod
-    def _parse_description(desc):
-        """parse the label to more explainable line"""
-        _, psp_type, psp_z, psp_tool, psp_family, *psp_version = desc.split(".")
-
-        # parse type to details representation
-        if psp_type == "nc":
-            psp_type = "Norm-conserving"
-        if psp_type == "us":
-            psp_type = "Ultrasoft"
-        if psp_type == "paw":
-            psp_type = "PAW"
-
-        out_label = f"{psp_z}\t|\t{psp_type}\t|\t{psp_family}:{psp_tool}:{'.'.join(psp_version)}"
-        # if extra:
-        #     out_label += f':{extra}'
-
-        return out_label
 
 
 class PseudoSelectWidget(ipw.VBox):
