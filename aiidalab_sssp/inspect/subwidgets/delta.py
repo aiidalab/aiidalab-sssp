@@ -32,8 +32,14 @@ class EOSwidget(ipw.VBox):
 
         if change["new"]:
             label = change["new"]
-            pseudo_delta = self.selected_pseudos[label]["delta_measure"]
-            del pseudo_delta["output_parameters"]
+            pseudo_delta = {}
+
+            for k, v in self.selected_pseudos[label]["delta_measure"].items():
+                if k != "output_parameters":
+                    pseudo_delta[k] = v
+            # pseudo_delta = {k, v for k, v in self.selected_pseudos[label]["delta_measure"].items() if k != 'output_parameters'}
+            # del pseudo_delta["output_parameters"]
+
             fig = pseudo_eos_galary(pseudo_delta)
 
             with self.eos_out:

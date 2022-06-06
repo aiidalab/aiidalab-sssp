@@ -1,50 +1,35 @@
 import json
+import os
 
 import ipywidgets as ipw
 import traitlets
 
-# the mock db is a folder which contains pseudos in the sub-folders named by element seprately.
-# This should be some lightweight database constructed from SSSP web page and local-run aiida postgresql database
-SSSP_JSON = {
-    "Mg": "https://raw.githubusercontent.com/unkcpz/sssp-verify-scripts/demo_results/results/Mg.json",
-    "Si": "https://raw.githubusercontent.com/unkcpz/sssp-verify-scripts/demo_results/results/Si.json",
-}
-SSSP_ARCHIVE = {
-    "Mg": "https://raw.githubusercontent.com/unkcpz/sssp-verify-scripts/demo_results/results/Mg.aiida",
-    "Si": "https://raw.githubusercontent.com/unkcpz/sssp-verify-scripts/demo_results/results/Si.aiida",
-}
+from aiidalab_sssp.inspect import SSSP_DB
 
 
-def _load_pseudos_from_json(db, element):
-    from urllib import request
+def _load_pseudo_list(element, db=SSSP_DB) -> list:
+    """Open result json file of element return list of pseudo labels
+    if element is None, return empty list.
+    """
+    if element:
+        json_fn = os.path.join(db, f"{element}.json")
+        with open(json_fn, "r") as fh:
+            pseudos = json.load(fh)
 
-    pseudos_url = db.get(element, None)
+        return list(pseudos.keys())
 
-    if pseudos_url:
-        with request.urlopen(pseudos_url) as url:
-            pseudos = json.loads(url.read().decode())
-    else:
-        return None
-
-    return pseudos
+    return list()
 
 
 class SelectMultipleCheckbox(ipw.VBox):
-    """Widget with a search field and lots of checkboxes"""
+    """Widget with a search field and lots of checkboxes of pseudopotentials"""
 
     options = traitlets.List()
     value = traitlets.List()
 
     def __init__(self, tick_all=True, **kwargs):
         self.tick_all = tick_all
-        self.checkbox_dict = {
-            f"{desc}": ipw.Checkbox(
-                description=self._parse_desc(desc),
-                value=self.tick_all,
-                style={"description_width": "initial"},
-            )
-            for desc in self.options
-        }
+        self.checkbox_dict = {}
         self._update_checkbox_group()
 
         super().__init__(children=list(self.checkbox_dict.values()), **kwargs)
@@ -73,7 +58,7 @@ class SelectMultipleCheckbox(ipw.VBox):
         # when options list (element rechoose) change update all checkboxes
         self.checkbox_dict = {
             f"{desc}": ipw.Checkbox(
-                description=self._parse_desc(desc),
+                description=self._parse_description(desc),
                 value=self.tick_all,
                 style={"description_width": "initial"},
             )
@@ -83,9 +68,11 @@ class SelectMultipleCheckbox(ipw.VBox):
         self._update_checkbox_group()
 
     @staticmethod
-    def _parse_desc(desc):
+    def _parse_description(desc):
         """parse the label to more explainable line"""
-        _, psp_type, psp_z, psp_family, psp_version = desc.split("/")[0:5]
+        _, psp_type, psp_z, psp_tool, psp_family, *psp_version = desc.split(".")
+
+        # parse type to details representation
         if psp_type == "nc":
             psp_type = "Norm-conserving"
         if psp_type == "us":
@@ -93,67 +80,49 @@ class SelectMultipleCheckbox(ipw.VBox):
         if psp_type == "paw":
             psp_type = "PAW"
 
-        if psp_family == "psl":
-            psp_family = "PSlibrary"
-        if psp_family == "dojo":
-            psp_family = "DOJO"
-        if psp_family == "sg15":
-            psp_family = "SG15"
-
-        out_label = f"""{psp_z}\t|\t{psp_type}\t|\t{psp_family}-{psp_version}"""
+        out_label = f"{psp_z}\t|\t{psp_type}\t|\t{psp_family}:{psp_tool}:{'.'.join(psp_version)}"
+        # if extra:
+        #     out_label += f':{extra}'
 
         return out_label
 
 
 class PseudoSelectWidget(ipw.VBox):
-    pseudos_dict = traitlets.Dict(allow_none=True)
-    selected_element = traitlets.Unicode(allow_none=True)
-    selected_pseudos = traitlets.Dict(allow_none=True)
+    element = traitlets.Unicode(allow_none=True)
+    selected_pseudos = traitlets.List(allow_none=True)
 
     NO_ELEMENT_INFO = "No element is selected"
 
     def __init__(self):
         self.help_info = ipw.HTML(self.NO_ELEMENT_INFO)
-        self.multi_select_widget = SelectMultipleCheckbox(
+        self.multiple_selection = SelectMultipleCheckbox(
             disabled=False, layout=ipw.Layout(width="98%")
         )
-        self.multi_select_widget.observe(
-            self._on_multi_select_widget_change, names="value"
+        self.multiple_selection.observe(
+            self._on_multiple_selection_change, names="value"
         )
 
         super().__init__(
             children=[
                 self.help_info,
-                self.multi_select_widget,
+                self.multiple_selection,
             ]
         )
 
-    @traitlets.observe("selected_element")
-    def _observe_selected_elements(self, change):
+    @traitlets.observe("element")
+    def _observe_elements(self, change):
         if change["new"]:
-            # if the element is selected, get the element
-            self.help_info.value = f"Please choose pseudopotentials of element {self.selected_element} to inspect:"
-
-        if self.selected_element:
-            self.pseudos_dict = _load_pseudos_from_json(
-                SSSP_JSON, self.selected_element
+            # if select/unselect new element update prompt help info
+            self.help_info.value = (
+                f"Please choose pseudopotentials of element {self.element} to inspect:"
             )
 
-        self.multi_select_widget.options = (
-            tuple(self.pseudos_dict.keys()) if self.pseudos_dict else tuple()
-        )
+            # If an element is chosen update checkbox list
+            self.pseudo_list = _load_pseudo_list(self.element)
+            self.multiple_selection.options = self.pseudo_list
 
-        # the default when choose an element should choose all pseudos
-        self.selected_pseudos = self.pseudos_dict
+            # select all pseudos of element as default
+            self.selected_pseudos = self.pseudo_list
 
-    def _on_multi_select_widget_change(self, change):
-        pseudos = dict()
-        for pseudo in change["new"]:
-            pseudos[pseudo] = self.pseudos_dict[pseudo]
-        self.selected_pseudos = pseudos
-
-    @traitlets.observe("pseudos_dict")
-    def _observe_selected_pseudos(self, _):
-        self.multi_select_widget.options = (
-            tuple(self.pseudos_dict.keys()) if self.pseudos_dict else tuple()
-        )
+    def _on_multiple_selection_change(self, change):
+        self.selected_pseudos = change["new"]
