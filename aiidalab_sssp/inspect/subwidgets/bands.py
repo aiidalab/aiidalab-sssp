@@ -11,14 +11,12 @@ from aiida_sssp_workflow.utils import NONMETAL_ELEMENTS
 from IPython.display import clear_output, display
 from widget_bandsplot import BandsPlotWidget
 
-from aiidalab_sssp.inspect import SSSP_DB, parse_label
+from aiidalab_sssp.inspect import SSSP_DB, _px, extract_element, parse_label
 from aiidalab_sssp.inspect.band_util import get_bands_distance
 
 _DEGAUSS = 0.045
 _RY_TO_EV = 13.6056980659
 _FERMI_SHIFT = 10.0  # eV in protocol FIXME also change title of plot Tab widget
-
-_px = 1 / plt.rcParams["figure.dpi"]  # unit pixel for plot
 
 
 def _bandview(json_path):
@@ -92,7 +90,7 @@ class BandStructureWidget(ipw.VBox):
         )
 
         with self.band_structure:
-            clear_output()
+            clear_output(wait=True)
             display(_band_structure_preview)
 
 
@@ -140,7 +138,7 @@ class BandChessboard(ipw.VBox):
         self._render_plot(ax_v, ax_c, arr_v=arr_v, arr_c=arr_c, labels=labels)
 
         with output:
-            clear_output()
+            clear_output(wait=True)
             display(fig.canvas)
 
     @staticmethod
@@ -190,7 +188,7 @@ class BandChessboard(ipw.VBox):
     def _bands_distance(self, pseudos):
         """compute bands distance"""
         labels = list(pseudos.keys())
-        element = labels[0].split(".")[0]
+        element = extract_element(pseudos)
         do_smearing = element not in NONMETAL_ELEMENTS
 
         fermi_shift = _FERMI_SHIFT

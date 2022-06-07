@@ -2,8 +2,40 @@
 import random
 from pathlib import Path
 
+import matplotlib.pyplot as plt
+
 DB_FOLDER = Path.home().joinpath(".cache", "SSSP")
 SSSP_DB = Path.joinpath(DB_FOLDER, "sssp_db")
+
+_px = 1 / plt.rcParams["figure.dpi"]  # unit pixel for plot
+
+
+def extract_element(pseudos):
+    try:
+        # Since the element are same for all, use first one
+        label0 = list(pseudos.keys())[0]
+        element = label0.split(".")[0]
+    except Exception:
+        element = None
+
+    return element
+
+
+def get_conf_list(element):
+    """get configuration list from element"""
+    from aiida_sssp_workflow.utils import (
+        OXIDE_CONFIGURATIONS,
+        RARE_EARTH_ELEMENTS,
+        UNARIE_CONFIGURATIONS,
+    )
+
+    if element == "O":
+        return UNARIE_CONFIGURATIONS + ["TYPICAL"]
+
+    if element in RARE_EARTH_ELEMENTS:
+        return OXIDE_CONFIGURATIONS + ["RE"]
+
+    return OXIDE_CONFIGURATIONS + UNARIE_CONFIGURATIONS + ["TYPICAL"]
 
 
 def parse_label(label):
@@ -12,7 +44,7 @@ def parse_label(label):
     version = ".".join(version)
 
     if type == "nc":
-        full_type = "Norm-conserving"
+        full_type = "NC"
     if type == "us":
         full_type = "Ultrasoft"
     if type == "paw":
@@ -25,8 +57,8 @@ def parse_label(label):
         "tool": tool,
         "family": family,
         "version": version,
-        "representive_label": f"{z}|{full_type}|{family}:{tool}:{version}",
-        "concise_label": f"{z}|{type}|{family}:{version}",
+        "representive_label": f"{z}|{full_type}|{family}|{tool}|{version}",
+        "concise_label": f"{z}|{type}|{family}|{version}",
     }
 
 

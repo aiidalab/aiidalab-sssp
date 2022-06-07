@@ -59,6 +59,7 @@ class SelectMultipleCheckbox(ipw.VBox):
                 description=parse_label(desc)["representive_label"],
                 value=self.tick_all,
                 style={"description_width": "initial"},
+                layout=ipw.Layout(width="50%", height="50%"),
             )
             for desc in self.options
         }

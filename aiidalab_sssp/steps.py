@@ -991,7 +991,7 @@ class NodeViewWidget(ipw.VBox):
     def _observe_node(self, change):
         if change["new"] != change["old"]:
             with self._output:
-                clear_output()
+                clear_output(wait=True)
                 if change["new"]:
                     display(viewer(change["new"]))
 

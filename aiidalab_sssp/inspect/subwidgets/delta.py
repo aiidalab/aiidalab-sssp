@@ -8,7 +8,7 @@ import traitlets
 from aiida_sssp_workflow.utils import OXIDE_CONFIGURATIONS, UNARIE_CONFIGURATIONS
 from IPython.display import clear_output, display
 
-from aiidalab_sssp.inspect import cmap, parse_label
+from aiidalab_sssp.inspect import cmap, extract_element, parse_label
 
 CONFIGURATIONS = OXIDE_CONFIGURATIONS + UNARIE_CONFIGURATIONS + ["RE", "TYPICAL"]
 
@@ -74,18 +74,13 @@ class NuMeasure(ipw.VBox):
             conf_list[label] = [i for i in _data.keys() if i in CONFIGURATIONS]
 
         # element
-        try:
-            # Since the element are same for all, use first one
-            label0 = list(pseudos.keys())[0]
-            element = label0.split(".")[0]
-        except Exception:
-            element = None
+        element = extract_element(pseudos)
 
         if measure_type == "delta":
-            keyname = "delta"
+            keyname = "delta/natoms"
             ylabel = "Δ -factor"
         elif measure_type == "nu":
-            keyname = "nu"
+            keyname = "nu/natoms"
             ylabel = "ν -factor"
 
         xticklabels = []
@@ -180,7 +175,7 @@ class EosWidget(ipw.VBox):
         self._render_plot(ax, data=data, configuration=configuration)
 
         with output:
-            clear_output()
+            clear_output(wait=True)
             display(fig.canvas)
 
     @staticmethod

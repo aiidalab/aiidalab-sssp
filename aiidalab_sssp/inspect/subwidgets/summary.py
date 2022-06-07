@@ -1,100 +1,107 @@
 import ipywidgets as ipw
 import pandas as pd
 import traitlets
+from aiida_sssp_workflow.workflows.verifications import (
+    DEFAULT_CONVERGENCE_PROPERTIES_LIST,
+)
 from IPython.display import clear_output, display
 
-CONFIGURATIONS = [
-    "BCC",
-    "FCC",
-    "SC",
-    "Diamond",
-    "XO",
-    "X2O",
-    "XO3",
-    "X2O",
-    "X2O3",
-    "X2O5",
-]
+from aiidalab_sssp.inspect import extract_element, get_conf_list, parse_label
 
 
 class SummaryWidget(ipw.VBox):
-    """output the convergence summary"""
+    """Summary of verification"""
 
-    selected_pseudos = traitlets.Dict(allow_none=True)
+    pseudos = traitlets.Dict(allow_none=True)
 
     def __init__(self):
         # Delta mesure
-        self.output = ipw.Output()
+        self.accuracy_summary = ipw.Output()
+        self.convergence_summary = ipw.Output()
+
+        self.toggle_show_rho = ipw.ToggleButton(
+            value=False,
+            description="Show ρ cutoff",
+            disabled=False,
+            button_style="info",
+            tooltip="Toggle show charge density cutoff",
+        )
+        self.toggle_show_rho.observe(self._on_toggle_show_rho_change, names="value")
 
         super().__init__(
             children=[
-                self.output,
+                self.accuracy_summary,
+                self.convergence_summary,
+                self.toggle_show_rho,
             ],
         )
 
-    @traitlets.observe("selected_pseudos")
+    def _on_toggle_show_rho_change(self, change):
+        with self.convergence_summary:
+            clear_output(wait=True)
+            display(self._render_convergence(show_rho=change["new"]))
+
+    @traitlets.observe("pseudos")
     def _on_pseudos_change(self, change):
-        if change["new"]:
-            with self.output:
-                clear_output(wait=True)
+        with self.accuracy_summary:
+            clear_output(wait=True)
+            display(self._render_accuracy())
 
-                display(pd_summary_table(change["new"]))
+        with self.convergence_summary:
+            clear_output(wait=True)
+            display(self._render_convergence())
 
-
-def pd_summary_table(pseudos: dict):
-
-    rows = []
-    for label, output in pseudos.items():
-        try:
-            lst = []
-            for configuration in CONFIGURATIONS:
-                try:
-                    res = output["delta_measure"]["output_parameters"][
-                        f"{configuration}"
-                    ]
-                    lst.append(res["nu"])
-                except Exception:
-                    pass
-
-            avg_delta = sum(lst) / len(lst)
-
-            cohesive_energy = output["convergence_cohesive_energy"][
-                "final_output_parameters"
+    def _render_accuracy(self):
+        rows = []
+        element = extract_element(self.pseudos)
+        conf_list = get_conf_list(element)
+        columns = ["label"] + conf_list
+        for label, pseudo_out in self.pseudos.items():
+            _data = pseudo_out["accuracy"]["delta"]["output_parameters"]
+            nu_list = [
+                round(_data.get(i, {}).get("nu/natoms", None), 3) for i in conf_list
             ]
-            phonon_frequencies = output["convergence_phonon_frequencies"][
-                "final_output_parameters"
-            ]
-            pressure = output["convergence_pressure"]["final_output_parameters"]
-            bands = output["convergence_bands"]["final_output_parameters"]
-            delta = output["convergence_delta"]["final_output_parameters"]
 
-            rows.append(
-                [
-                    label,
-                    (cohesive_energy["wfc_cutoff"], cohesive_energy["rho_cutoff"]),
-                    (
-                        phonon_frequencies["wfc_cutoff"],
-                        phonon_frequencies["rho_cutoff"],
-                    ),
-                    (pressure["wfc_cutoff"], pressure["rho_cutoff"]),
-                    (delta["wfc_cutoff"], delta["rho_cutoff"]),
-                    (bands["wfc_cutoff"], bands["rho_cutoff"]),
-                    avg_delta,
-                ]
-            )
+            output_label = parse_label(label)["representive_label"]
+            rows.append([output_label, *nu_list])
 
-        except Exception as e:
-            raise e
+        df = pd.DataFrame(rows, columns=columns)
+        df.style.hide_index()
+        return df
 
-    return pd.DataFrame(
-        rows,
-        columns=[
-            "label",
-            "cohesive energy",
-            "phonon frequencies",
-            "pressure",
-            "delta",
-            "bands",
-            "ν avg.",
-        ],
-    )
+    def _render_convergence(self, show_rho=False):
+        rows = []
+        prop_list = [i.split(".")[1] for i in DEFAULT_CONVERGENCE_PROPERTIES_LIST]
+        columns = ["label"] + [i.replace("_", " ") for i in prop_list]
+        for label, pseudo_out in self.pseudos.items():
+            _data = pseudo_out["convergence"]
+            cutoffs = []
+            for prop in prop_list:
+                wfc_cutoff = (
+                    _data.get(prop, {})
+                    .get("output_parameters", {})
+                    .get("wavefunction_cutoff", None)
+                )
+                rho_cutoff = (
+                    _data.get(prop, {})
+                    .get("output_parameters", {})
+                    .get("chargedensity_cutoff", None)
+                )
+                wfc_cutoff = int(wfc_cutoff) if wfc_cutoff else None
+                rho_cutoff = int(rho_cutoff) if rho_cutoff else None
+
+                if not wfc_cutoff:
+                    cutoffs.append(str("nan"))
+                    continue
+
+                if show_rho:
+                    cutoffs.append(f"{wfc_cutoff} ({rho_cutoff})")
+                else:
+                    cutoffs.append(f"{wfc_cutoff}")
+
+            output_label = parse_label(label)["representive_label"]
+            rows.append([output_label, *cutoffs])
+
+        df = pd.DataFrame(rows, columns=columns)
+        df.style.hide_index()
+        return df
