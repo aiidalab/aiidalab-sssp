@@ -165,14 +165,19 @@ def get_bands_distance(
     example of bandsdata_a -> dict = {
         "number_of_electrons": 10,
         "fermi_level": -0.97,
-        "bands": <bands array>,
-        "kpoints": <kpoints array>,
-        "weights": <weights array>,
+        "bands": <bands array> as list,
+        "kpoints": <kpoints array> as list,
+        "weights": <weights array> as list,
     }
 
 
     First aligh the number of two bands, e.g tranctrate the overceed nubmer of bands
     """
+    # post process to deserial list to numpy arrar
+    for key in ["bands", "kpoints", "weights"]:
+        bandsdata_a[key] = np.asarray(bandsdata_a[key])
+        bandsdata_b[key] = np.asarray(bandsdata_b[key])
+
     num_electrons_a = bandsdata_a["number_of_electrons"]
     num_electrons_b = bandsdata_b["number_of_electrons"]
 

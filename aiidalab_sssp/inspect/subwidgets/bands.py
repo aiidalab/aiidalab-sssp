@@ -1,20 +1,24 @@
 import itertools
 import json
+import os
 from pathlib import Path
 
 import ipywidgets as ipw
 import matplotlib.pyplot as plt
 import numpy as np
 import traitlets
-from aiida_sssp_workflow.calculations.calculate_bands_distance import get_bands_distance
 from aiida_sssp_workflow.utils import NONMETAL_ELEMENTS
 from IPython.display import clear_output, display
 from widget_bandsplot import BandsPlotWidget
 
 from aiidalab_sssp.inspect import SSSP_DB, parse_label
+from aiidalab_sssp.inspect.band_util import get_bands_distance
 
 _DEGAUSS = 0.045
 _RY_TO_EV = 13.6056980659
+_FERMI_SHIFT = 10.0  # eV in protocol FIXME also change title of plot Tab widget
+
+_px = 1 / plt.rcParams["figure.dpi"]  # unit pixel for plot
 
 
 def _bandview(json_path):
@@ -29,34 +33,29 @@ def _bandview(json_path):
     return data
 
 
-def recover_aiida_bands(data):
-    """return aiida bands and its band parameters from output json"""
-
-
 def _bands_distance(pseudos):
     labels = list(pseudos.keys())
     element = labels[0].split(".")[0]
-    is_metal = element not in NONMETAL_ELEMENTS
+    do_smearing = element not in NONMETAL_ELEMENTS
 
-    fermi_shift = 10  # eV in protocol FIXME also change title of plot Tab widget
+    fermi_shift = _FERMI_SHIFT
 
     arr_v = np.zeros((len(labels), len(labels)))
     arr_c = np.zeros((len(labels), len(labels)))
     for (idx1, label1), (idx2, label2) in itertools.combinations(enumerate(labels), 2):
-        data1 = _bandview(pseudos[label1]["accuracy"]["bands"]["bands"])
-        data2 = _bandview(pseudos[label2]["accuracy"]["bands"]["bands"])
-
-        bands_a, band_parameters_a = recover_aiida_bands(data1)
-        bands_b, band_parameters_b = recover_aiida_bands(data2)
+        bandsdata1 = _bandview(
+            os.path.join(SSSP_DB, pseudos[label1]["accuracy"]["bands"]["bands"])
+        )
+        bandsdata2 = _bandview(
+            os.path.join(SSSP_DB, pseudos[label2]["accuracy"]["bands"]["bands"])
+        )
 
         res = get_bands_distance(
-            bands_a=bands_a,
-            bands_b=bands_b,
-            band_parameters_a=band_parameters_a,
-            band_parameters_b=band_parameters_b,
+            bandsdata_a=bandsdata1,
+            bandsdata_b=bandsdata2,
             smearing=_DEGAUSS * _RY_TO_EV,
             fermi_shift=fermi_shift,
-            is_metal=is_metal,
+            do_smearing=do_smearing,
         )
         eta_v = res["eta_v"]
         max_diff_v = res["max_diff_v"]
@@ -156,9 +155,20 @@ class BandChessboard(ipw.VBox):
 
     def _render(self):
         """render bands chessboard side by side eta_v and eta_10"""
+        _MAX_NUM = 8
+        if len(self.pseudos) > _MAX_NUM:
+            # Since not well render to notebook, only take 8 entities
+            pseudos = {k: self.pseudos[k] for k in list(self.pseudos)[:_MAX_NUM]}
+            # !!! FIXME: MUST raise warning here to ask user to toggle for more to show
+
         output = self.chessboard
-        labels, arr_v, arr_c = _bands_distance(self.pseudos)
-        fig, (ax_v, ax_c) = plt.subplots(1, 2)
+        labels, arr_v, arr_c = _bands_distance(pseudos)
+        fig, (ax_v, ax_c) = plt.subplots(
+            1,
+            2,
+            gridspec_kw={"wspace": 0.05, "hspace": 0},
+            figsize=(1024 * _px, 720 * _px),
+        )
         fig.canvas.header_visible = False
         self._render_plot(ax_v, ax_c, arr_v=arr_v, arr_c=arr_c, labels=labels)
 
@@ -171,7 +181,9 @@ class BandChessboard(ipw.VBox):
         # label to concise label
         labels = [parse_label(i)["concise_label"] for i in labels]
 
-        for ax, arr, title in [(ax_v, arr_v, "eta_v"), (ax_c, arr_c, "eta_10")]:
+        for idx, (ax, arr, title) in enumerate(
+            [(ax_v, arr_v, r"$\eta_v$"), (ax_c, arr_c, r"$\eta_{10}$")]
+        ):
             ax.imshow(arr)
 
             # Show all ticks and label them with the respective list entries
@@ -182,9 +194,13 @@ class BandChessboard(ipw.VBox):
             ax.set_xticklabels(labels)
             ax.set_yticklabels(labels)
 
+            # specific for up side eta_v fig
+            if idx == 1:
+                ax.yaxis.set_visible(False)
+
             # Rotate the tick labels and set their alignment.
             plt.setp(
-                ax.get_xticklabels(), rotation=30, ha="right", rotation_mode="anchor"
+                ax.get_xticklabels(), rotation=60, ha="right", rotation_mode="anchor"
             )
 
             # Loop over data dimensions and create text annotations.
@@ -193,7 +209,7 @@ class BandChessboard(ipw.VBox):
                     ax.text(
                         j,
                         i,
-                        np.around(arr[i, j], decimals=3),
+                        np.around(arr[i, j], decimals=2),
                         ha="center",
                         va="center",
                         color="w",
