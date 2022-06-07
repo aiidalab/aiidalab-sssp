@@ -2,48 +2,7 @@ import ipywidgets as ipw
 import traitlets
 from IPython.display import clear_output, display
 
-from aiidalab_sssp.inspect.plot_utils import convergence, delta_measure_hist
-
-
-class PlotDeltaMeasureWidget(ipw.VBox):
-
-    selected_pseudos = traitlets.Dict(allow_none=True)
-
-    def __init__(self):
-        # measure button
-        # self.measure_tab = ipw.Tab(title=['Δ-factor', 'νΔ-factor'])
-        self.measure_tab = ipw.Tab()
-        self.measure_tab.set_title(0, "ν-factor")
-        self.measure_tab.set_title(1, "Δ-factor")
-
-        # Delta mesure
-        self.output_delta_measure = ipw.Output()
-
-        super().__init__(
-            children=[
-                self.measure_tab,
-                # self.output_delta_measure,
-            ],
-        )
-
-    @traitlets.observe("selected_pseudos")
-    def _on_pseudos_change(self, change):
-        out_nu = ipw.Output()
-        out_delta = ipw.Output()
-
-        if change["new"]:
-            with out_nu:
-                fig = delta_measure_hist(change["new"], "nu")
-                fig.canvas.header_visible = False
-                display(fig.canvas)
-
-            with out_delta:
-                fig = delta_measure_hist(change["new"], "delta")
-                fig.canvas.header_visible = False
-                display(fig.canvas)
-
-        children = [out_nu, out_delta]
-        self.measure_tab.children = children
+from aiidalab_sssp.inspect.plot_utils import convergence
 
 
 class _PlotConvergenBaseWidget(ipw.VBox):

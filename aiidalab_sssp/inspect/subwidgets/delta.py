@@ -1,8 +1,6 @@
 """Moudle contains widgets for accuracy delat results inspect.
 The widget EosWidget for showing Eos fit line of a given pseudo in the given configuration.
 The widget NuMeasure showing Nicola's Nu measure of all pseudos in all configurations"""
-import random
-
 import ipywidgets as ipw
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,7 +8,7 @@ import traitlets
 from aiida_sssp_workflow.utils import OXIDE_CONFIGURATIONS, UNARIE_CONFIGURATIONS
 from IPython.display import clear_output, display
 
-from aiidalab_sssp.inspect import parse_label
+from aiidalab_sssp.inspect import cmap, parse_label
 
 CONFIGURATIONS = OXIDE_CONFIGURATIONS + UNARIE_CONFIGURATIONS + ["RE", "TYPICAL"]
 
@@ -24,100 +22,6 @@ def birch_murnaghan(V, E0, V0, B0, B01):
     return E0 + 9.0 / 16.0 * B0 * V0 * (
         (r - 1.0) ** 3 * B01 + (r - 1.0) ** 2 * (6.0 - 4.0 * r)
     )
-
-
-def lighten_color(color, amount=0.5):
-    """
-    Lightens the given color by multiplying (1-luminosity) by the given amount.
-    Input can be matplotlib color string, hex string, or RGB tuple.
-    REF from https://stackoverflow.com/questions/37765197/darken-or-lighten-a-color-in-matplotlib
-
-    Examples:
-    >> lighten_color('g', 0.3)
-    >> lighten_color('#F034A3', 0.6)
-    >> lighten_color((.3,.55,.1), 0.5)
-    """
-    import colorsys
-
-    import matplotlib.colors as mc
-
-    try:
-        c = mc.cnames[color]
-    except Exception:
-        c = color
-    c = colorsys.rgb_to_hls(*mc.to_rgb(c))
-    return colorsys.hls_to_rgb(c[0], 1 - amount * (1 - c[1]), c[2])
-
-
-def cmap(pseudo_info: dict) -> str:
-    """Return RGB string of color for given pseudo info
-    Hardcoded at the momment.
-    """
-    if pseudo_info["family"] == "sg15" and pseudo_info["version"] == "v0":
-        return "#000000"
-
-    if pseudo_info["family"] == "gbrv":
-        return "#4682B4"
-
-    if (
-        pseudo_info["family"] == "psl"
-        and pseudo_info["type"] == "us"
-        and pseudo_info["version"] == "v1.0.0-high"
-    ):
-        return "#F50E02"
-
-    if (
-        pseudo_info["family"] == "psl"
-        and pseudo_info["type"] == "us"
-        and pseudo_info["version"] == "v1.0.0-low"
-    ):
-        return lighten_color("#F50E02")
-
-    if (
-        pseudo_info["family"] == "psl"
-        and pseudo_info["type"] == "paw"
-        and pseudo_info["version"] == "v1.0.0-high"
-    ):
-        return "#008B00"
-
-    if (
-        pseudo_info["family"] == "psl"
-        and pseudo_info["type"] == "paw"
-        and pseudo_info["version"] == "v1.0.0-low"
-    ):
-        return lighten_color("#008B00")
-
-    if (
-        pseudo_info["family"] == "psl"
-        and pseudo_info["type"] == "paw"
-        and "v0." in pseudo_info["version"]
-    ):
-        return "#FF00FF"
-
-    if (
-        pseudo_info["family"] == "psl"
-        and pseudo_info["type"] == "us"
-        and "v0." in pseudo_info["version"]
-    ):
-        return lighten_color("#FF00FF")
-
-    if pseudo_info["family"] == "dojo" and pseudo_info["version"] == "v4-str":
-        return "#F9A501"
-
-    if pseudo_info["family"] == "dojo" and pseudo_info["version"] == "v4-std":
-        return lighten_color("#F9A501")
-
-    if pseudo_info["family"] == "jth" and pseudo_info["version"] == "v1.1-str":
-        return "#00C5ED"
-
-    if pseudo_info["family"] == "jth" and pseudo_info["version"] == "v1.1-std":
-        return lighten_color("#00C5ED")
-
-    # TODO: more mapping
-    # if a unknow type generate random color based on ascii sum
-    ascn = sum([ord(c) for c in pseudo_info["representive_label"]])
-    random.seed(ascn)
-    return "#%06x" % random.randint(0, 0xFFFFFF)
 
 
 class NuMeasure(ipw.VBox):
@@ -265,7 +169,7 @@ class EosWidget(ipw.VBox):
             self._render()
 
     def _render(self):
-        """once called renden with current instance"""
+        """once called render plot with current instance"""
         output = self.eos_preview
         label = self.select_pseudo.value
         configuration = self.select_configuration.value
