@@ -14,7 +14,7 @@ def _load_pseudos(element, db=SSSP_DB) -> dict:
         with open(json_fn, "r") as fh:
             pseudos = json.load(fh)
 
-        return pseudos
+        return {key: pseudos[key] for key in sorted(pseudos.keys(), key=str.lower)}
 
     return dict()
 
@@ -105,4 +105,6 @@ class PseudoSelectWidget(ipw.VBox):
             self.selected_pseudos = self.pseudos
 
     def _on_multiple_selection_change(self, change):
-        self.selected_pseudos = {k: self.pseudos[k] for k in change["new"]}
+        self.selected_pseudos = {
+            k: self.pseudos[k] for k in sorted(change["new"], key=str.lower)
+        }

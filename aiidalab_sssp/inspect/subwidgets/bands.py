@@ -33,44 +33,6 @@ def _bandview(json_path):
     return data
 
 
-def _bands_distance(pseudos):
-    labels = list(pseudos.keys())
-    element = labels[0].split(".")[0]
-    do_smearing = element not in NONMETAL_ELEMENTS
-
-    fermi_shift = _FERMI_SHIFT
-
-    arr_v = np.zeros((len(labels), len(labels)))
-    arr_c = np.zeros((len(labels), len(labels)))
-    for (idx1, label1), (idx2, label2) in itertools.combinations(enumerate(labels), 2):
-        bandsdata1 = _bandview(
-            os.path.join(SSSP_DB, pseudos[label1]["accuracy"]["bands"]["bands"])
-        )
-        bandsdata2 = _bandview(
-            os.path.join(SSSP_DB, pseudos[label2]["accuracy"]["bands"]["bands"])
-        )
-
-        res = get_bands_distance(
-            bandsdata_a=bandsdata1,
-            bandsdata_b=bandsdata2,
-            smearing=_DEGAUSS * _RY_TO_EV,
-            fermi_shift=fermi_shift,
-            do_smearing=do_smearing,
-        )
-        eta_v = res["eta_v"]
-        max_diff_v = res["max_diff_v"]
-        eta_c = res["eta_c"]
-        max_diff_c = res["max_diff_c"]
-
-        arr_v[idx1, idx2] = eta_v
-        arr_v[idx2, idx1] = max_diff_v
-
-        arr_c[idx1, idx2] = eta_c
-        arr_c[idx2, idx1] = max_diff_c
-
-    return labels, arr_v, arr_c
-
-
 class BandStructureWidget(ipw.VBox):
     """
     widget for band structure representation. When pseudos set the dropdown enabled
@@ -142,6 +104,9 @@ class BandChessboard(ipw.VBox):
     def __init__(self):
         self.chessboard = ipw.Output()
 
+        # for caching
+        self.__cache_bands = {}
+
         super().__init__(
             children=[
                 ipw.HTML("<h2> Accuracy: Bands distance chessboard</h2>"),
@@ -160,14 +125,16 @@ class BandChessboard(ipw.VBox):
             # Since not well render to notebook, only take 8 entities
             pseudos = {k: self.pseudos[k] for k in list(self.pseudos)[:_MAX_NUM]}
             # !!! FIXME: MUST raise warning here to ask user to toggle for more to show
+        else:
+            pseudos = {k: self.pseudos[k] for k in list(self.pseudos)[:]}  # all pseudos
 
         output = self.chessboard
-        labels, arr_v, arr_c = _bands_distance(pseudos)
+        labels, arr_v, arr_c = self._bands_distance(pseudos)
         fig, (ax_v, ax_c) = plt.subplots(
             1,
             2,
-            gridspec_kw={"wspace": 0.05, "hspace": 0},
-            figsize=(1024 * _px, 720 * _px),
+            gridspec_kw={"wspace": 0.02, "hspace": 0},
+            figsize=(1020 * _px, 680 * _px),
         )
         fig.canvas.header_visible = False
         self._render_plot(ax_v, ax_c, arr_v=arr_v, arr_c=arr_c, labels=labels)
@@ -200,7 +167,10 @@ class BandChessboard(ipw.VBox):
 
             # Rotate the tick labels and set their alignment.
             plt.setp(
-                ax.get_xticklabels(), rotation=60, ha="right", rotation_mode="anchor"
+                ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor"
+            )
+            plt.setp(
+                ax.get_yticklabels(), rotation=45, ha="right", rotation_mode="anchor"
             )
 
             # Loop over data dimensions and create text annotations.
@@ -216,3 +186,52 @@ class BandChessboard(ipw.VBox):
                     )
 
             ax.set_title(title)
+
+    def _bands_distance(self, pseudos):
+        """compute bands distance"""
+        labels = list(pseudos.keys())
+        element = labels[0].split(".")[0]
+        do_smearing = element not in NONMETAL_ELEMENTS
+
+        fermi_shift = _FERMI_SHIFT
+
+        arr_v = np.zeros((len(labels), len(labels)))
+        arr_c = np.zeros((len(labels), len(labels)))
+        for (idx1, label1), (idx2, label2) in itertools.combinations(
+            enumerate(labels), 2
+        ):
+            # load cache if exist.
+            # the pseudos passed in the function is in order, keys are sorted when created
+            # Therefore, can always be '(label1)(label2)'
+            cache_key = f"({label1})({label2})"
+            if cache_key in self.__cache_bands:
+                distance = self.__cache_bands.get(cache_key)
+            else:
+                bandsdata1 = _bandview(
+                    os.path.join(SSSP_DB, pseudos[label1]["accuracy"]["bands"]["bands"])
+                )
+                bandsdata2 = _bandview(
+                    os.path.join(SSSP_DB, pseudos[label2]["accuracy"]["bands"]["bands"])
+                )
+
+                distance = get_bands_distance(
+                    bandsdata_a=bandsdata1,
+                    bandsdata_b=bandsdata2,
+                    smearing=_DEGAUSS * _RY_TO_EV,
+                    fermi_shift=fermi_shift,
+                    do_smearing=do_smearing,
+                )
+                self.__cache_bands[cache_key] = distance
+
+            eta_v = distance["eta_v"]
+            max_diff_v = distance["max_diff_v"]
+            eta_c = distance["eta_c"]
+            max_diff_c = distance["max_diff_c"]
+
+            arr_v[idx1, idx2] = eta_v
+            arr_v[idx2, idx1] = max_diff_v
+
+            arr_c[idx1, idx2] = eta_c
+            arr_c[idx2, idx1] = max_diff_c
+
+        return labels, arr_v, arr_c
