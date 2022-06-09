@@ -19,27 +19,40 @@ class SummaryWidget(ipw.VBox):
         self.accuracy_summary = ipw.Output()
         self.convergence_summary = ipw.Output()
 
-        self.toggle_show_rho = ipw.ToggleButton(
-            value=False,
-            description="Show ρ cutoff",
+        self._show_rho = False
+        self._show_dual = False
+        self.toggle_show_dual_or_rho = ipw.ToggleButtons(
+            options=["Default", "Show ρ cutoff", "Show dual"],
+            value="Default",
+            # description="Show extra cutoff information",
             disabled=False,
-            button_style="info",
-            tooltip="Toggle show charge density cutoff",
+            tooltip="Toggle show rho or dual value",
         )
-        self.toggle_show_rho.observe(self._on_toggle_show_rho_change, names="value")
+        self.toggle_show_dual_or_rho.observe(
+            self._on_toggle_show_dual_or_rho_change, names="value"
+        )
 
         super().__init__(
             children=[
                 self.accuracy_summary,
                 self.convergence_summary,
-                self.toggle_show_rho,
+                self.toggle_show_dual_or_rho,
             ],
         )
 
-    def _on_toggle_show_rho_change(self, change):
+    def _on_toggle_show_dual_or_rho_change(self, change):
+        if change["new"] == "Show ρ cutoff":
+            self._show_dual = False
+            self._show_rho = True
+        elif change["new"] == "Show dual":
+            self._show_rho = False
+            self._show_dual = True
+        else:
+            self._show_dual = False
+            self._show_rho = False
         with self.convergence_summary:
             clear_output(wait=True)
-            display(self._render_convergence(show_rho=change["new"]))
+            display(self._render_convergence())
 
     @traitlets.observe("pseudos")
     def _on_pseudos_change(self, change):
@@ -69,7 +82,7 @@ class SummaryWidget(ipw.VBox):
         df.style.hide_index()
         return df
 
-    def _render_convergence(self, show_rho=False):
+    def _render_convergence(self):
         rows = []
         prop_list = [i.split(".")[1] for i in DEFAULT_CONVERGENCE_PROPERTIES_LIST]
         columns = ["label"] + [i.replace("_", " ") for i in prop_list]
@@ -94,8 +107,13 @@ class SummaryWidget(ipw.VBox):
                     cutoffs.append(str("nan"))
                     continue
 
-                if show_rho:
+                # not allow to show at the same time
+                assert not (self._show_dual and self._show_rho)
+                if self._show_rho:
                     cutoffs.append(f"{wfc_cutoff} ({rho_cutoff})")
+                elif self._show_dual:
+                    dual = round(rho_cutoff / wfc_cutoff, 1)
+                    cutoffs.append(f"{wfc_cutoff} ({dual})")
                 else:
                     cutoffs.append(f"{wfc_cutoff}")
 

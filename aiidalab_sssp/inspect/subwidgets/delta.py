@@ -222,6 +222,16 @@ class EosWidget(ipw.VBox):
             color="red",
         )
 
+        center_x = (max(volumes) + min(volumes)) / 2
+        center_y = (max(energies) + min(energies)) / 2
+
+        # write text of nu value in close middle
+        nu = round(data["output_parameters"]["nu/natoms"], 3)
+        delta = round(data["output_parameters"]["delta/natoms"], 3)
+        plt.text(
+            center_x, center_y, f"$\\nu$={nu} meV/atom\n$\\Delta$={delta} meV/atom"
+        )
+
         ax.legend(loc="upper center")
         ax.set_xlabel("Cell volume per formula unit ($\\AA^3$)")
         ax.set_ylabel("$E - TS$ per formula unit (eV)")
