@@ -4,7 +4,7 @@ from aiida_sssp_workflow.utils import get_protocol
 from IPython.display import clear_output, display
 from matplotlib import pyplot as plt
 
-from aiidalab_sssp.inspect import _px, cmap, parse_label
+from aiidalab_sssp.inspect import _px, cmap, extract_element, parse_label
 from aiidalab_sssp.inspect.subwidgets.summary import SummaryWidget
 
 
@@ -186,6 +186,7 @@ class ConvergenceWidget(ipw.VBox):
         """Actual render of plot"""
         wfname = property_map[property]["name"]
         measure = property_map[property]["measure"]
+        element = extract_element(self.pseudos)
 
         for label, pseudo_out in self.pseudos.items():
             # TODO: Calculate the one delta measure and attach to label value
@@ -226,7 +227,7 @@ class ConvergenceWidget(ipw.VBox):
         # ax_wfc.set_ylabel(property_map[property]['ylabel'])
         ax_wfc.set_xlabel("Wavefuntion cutoff (Ry)")
         ax_wfc.set_title(
-            "Fixed rho cutoff at 200 * dual (dual=4 for NC and dual=8 for non-NC)"
+            f"Convergence verification on element {element} (dual=4 for NC and dual=8 for non-NC)"
         )
         ax_wfc.legend(loc="upper right", prop={"size": 6})
 

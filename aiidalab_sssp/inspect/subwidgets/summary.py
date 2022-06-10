@@ -89,7 +89,7 @@ class SummaryWidget(ipw.VBox):
         rows = []
         element = extract_element(self.pseudos)
         conf_list = get_conf_list(element)
-        columns = ["label"] + conf_list
+        columns = ["Pseudopotential label"] + conf_list
         for label, pseudo_out in self.pseudos.items():
             _data = pseudo_out["accuracy"]["delta"]["output_parameters"]
             nu_list = [
@@ -106,7 +106,7 @@ class SummaryWidget(ipw.VBox):
     def _render_convergence(self):
         rows = []
         prop_list = [i.split(".")[1] for i in DEFAULT_CONVERGENCE_PROPERTIES_LIST]
-        columns = ["label"] + [i.replace("_", " ") for i in prop_list]
+        columns = ["Pseudopotential label"] + [i.replace("_", " ") for i in prop_list]
         for label, pseudo_out in self.pseudos.items():
             _data = pseudo_out["convergence"]
             cutoffs = []
@@ -125,8 +125,8 @@ class SummaryWidget(ipw.VBox):
                     .get("output_parameters", {})
                     .get("chargedensity_cutoff", None)
                 )
-                wfc_cutoff = int(wfc_cutoff) if wfc_cutoff else "nan"
-                rho_cutoff = int(rho_cutoff) if rho_cutoff else "nan"
+                wfc_cutoff_str = f"{int(wfc_cutoff)} Ry" if wfc_cutoff else "nan"
+                rho_cutoff_str = f"{int(rho_cutoff)} Ry" if rho_cutoff else "nan"
                 # compute dual. The dual is same for both precision and efficiency
                 try:
                     dual = round(rho_cutoff / wfc_cutoff, 1)
@@ -141,11 +141,13 @@ class SummaryWidget(ipw.VBox):
                         .get("all_criteria_wavefunction_cutoff", {})
                         .get("precision", None)
                     )
-                    wfc_cutoff = int(wfc_cutoff) if wfc_cutoff else "nan"
+                    wfc_cutoff_str = f"{int(wfc_cutoff)} Ry" if wfc_cutoff else "nan"
                     try:
                         rho_cutoff = int(wfc_cutoff * dual)
                     except Exception:
-                        rho_cutoff = "nan"
+                        rho_cutoff_str = "nan"
+                    else:
+                        rho_cutoff_str = f"{rho_cutoff} Ry"
 
                     if not wfc_cutoff:
                         cutoffs.append(str("nan"))
@@ -154,11 +156,11 @@ class SummaryWidget(ipw.VBox):
                 # not allow to show at the same time
                 assert not (self._show_dual and self._show_rho)
                 if self._show_rho:
-                    cutoffs.append(f"{wfc_cutoff} ({rho_cutoff})")
+                    cutoffs.append(f"{wfc_cutoff_str} ({rho_cutoff_str})")
                 elif self._show_dual:
-                    cutoffs.append(f"{wfc_cutoff} ({dual})")
+                    cutoffs.append(f"{wfc_cutoff_str} ({dual})")
                 else:
-                    cutoffs.append(f"{wfc_cutoff}")
+                    cutoffs.append(f"{wfc_cutoff_str}")
 
             output_label = parse_label(label)["representive_label"]
             rows.append([output_label, *cutoffs])
