@@ -94,11 +94,11 @@ class PseudoSelectWidget(ipw.VBox):
         self._element_pseudos = {}
 
         self.help_info = ipw.HTML(self.NO_ELEMENT_INFO)
-        self.reset = ipw.Button(
+        self.reset_select = ipw.Button(
             description="Reset",
             button_style="info",
         )
-        self.reset.on_click(self._on_reset_click)
+        self.reset_select.on_click(self._on_reset_click)
 
         self.select_all = ipw.Button(
             description="Select All",
@@ -116,7 +116,7 @@ class PseudoSelectWidget(ipw.VBox):
         super().__init__(
             children=[
                 self.help_info,
-                ipw.HBox(children=[self.reset, self.select_all]),
+                ipw.HBox(children=[self.reset_select, self.select_all]),
                 self.multiple_selection,
             ]
         )
@@ -145,8 +145,16 @@ class PseudoSelectWidget(ipw.VBox):
             self._element_pseudos = _load_pseudos(self.element)
             self.multiple_selection.options = list(self._element_pseudos.keys())
             self.selected_pseudos = self._element_pseudos.copy()
+        else:
+            # element is unselected reset multiple select widget
+            self.reset()
 
     def _on_multiple_selection_change(self, change):
         self.selected_pseudos = {
             k: self._element_pseudos[k] for k in sorted(change["new"], key=str.lower)
         }
+
+    def reset(self):
+        self.help_info.value = self.NO_ELEMENT_INFO
+        self.multiple_selection.options = list()
+        self.selected_pseudos = {}
