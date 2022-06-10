@@ -29,13 +29,15 @@ class NuMeasure(ipw.VBox):
     pseudos = traitlets.Dict(allow_none=True)
 
     def __init__(self):
+        self.out_nu = ipw.Output()
+        self.out_delta = ipw.Output()
+
         # measure button
         self.measure_tab = ipw.Tab()
         self.measure_tab.set_title(0, "ν-factor")
         self.measure_tab.set_title(1, "Δ-factor")
 
-        # Delta mesure
-        self.output_delta_measure = ipw.Output()
+        self.measure_tab.children = [self.out_nu, self.out_delta]
 
         super().__init__(
             children=[
@@ -45,22 +47,22 @@ class NuMeasure(ipw.VBox):
 
     @traitlets.observe("pseudos")
     def _on_pseudos_change(self, change):
-        out_nu = ipw.Output()
-        out_delta = ipw.Output()
 
         if change["new"]:
-            with out_nu:
+            self.layout.visibility = "visible"
+            with self.out_nu:
+                clear_output()
                 fig = self._render_plot(change["new"], "nu")
                 fig.canvas.header_visible = False
                 display(fig.canvas)
 
-            with out_delta:
+            with self.out_delta:
+                clear_output()
                 fig = self._render_plot(change["new"], "delta")
                 fig.canvas.header_visible = False
                 display(fig.canvas)
-
-            children = [out_nu, out_delta]
-            self.measure_tab.children = children
+        else:
+            self.layout.visibility = "hidden"
 
     @staticmethod
     def _render_plot(pseudos: dict, measure_type):

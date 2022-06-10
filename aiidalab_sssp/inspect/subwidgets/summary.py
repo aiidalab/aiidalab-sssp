@@ -56,13 +56,17 @@ class SummaryWidget(ipw.VBox):
 
     @traitlets.observe("pseudos")
     def _on_pseudos_change(self, change):
-        with self.accuracy_summary:
-            clear_output(wait=True)
-            display(self._render_accuracy())
+        if change["new"]:
+            self.layout.visibility = "visible"
+            with self.accuracy_summary:
+                clear_output(wait=True)
+                display(self._render_accuracy())
 
-        with self.convergence_summary:
-            clear_output(wait=True)
-            display(self._render_convergence())
+            with self.convergence_summary:
+                clear_output(wait=True)
+                display(self._render_convergence())
+        else:
+            self.layout.visibility = "hidden"
 
     def _render_accuracy(self):
         rows = []
