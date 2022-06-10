@@ -147,7 +147,10 @@ class EosWidget(ipw.VBox):
     @traitlets.observe("pseudos")
     def _on_pseudos_change(self, change):
         if change["new"]:
+            self.layout.visibility = "visible"
             self.select_pseudo.options = list(self.pseudos.keys())
+        else:
+            self.layout.visibility = "hidden"
 
     def _on_pseudo_select(self, change):
         """Update configuration dropdown list and select first entity"""

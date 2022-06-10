@@ -122,12 +122,21 @@ class ConvergenceWidget(ipw.VBox):
         self.convergence_accordion.observe(
             self._on_convergence_accordion_change, names="selected_index"
         )
+        self.accordions = ipw.VBox(
+            children=[
+                self.summary_accordion,
+                self.convergence_accordion,
+            ]
+        )
+        self.accordions.layout.visibility = "hidden"
+
+        self.help_message = ipw.HTML("<h2> Convergence results </h2>")
+        self.help_message.layout.visibility = "hidden"
 
         super().__init__(
             children=[
-                ipw.HTML("<h2> Convergence results </h2>"),
-                self.summary_accordion,
-                self.convergence_accordion,
+                self.help_message,
+                self.accordions,
             ]
         )
 
@@ -139,7 +148,13 @@ class ConvergenceWidget(ipw.VBox):
     @traitlets.observe("pseudos")
     def _on_pseudos_change(self, change):
         """only update plot when accordion open"""
-        self.convergence_accordion.selected_index = None
+        if change["new"]:
+            self.accordions.layout.visibility = "visible"
+            self.help_message.layout.visibility = "visible"
+            self.convergence_accordion.selected_index = None
+        else:
+            self.accordions.layout.visibility = "hidden"
+            self.help_message.layout.visibility = "hidden"
 
     def _on_convergence_accordion_change(self, change):
         # only render when accordion open up

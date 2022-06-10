@@ -95,7 +95,7 @@ class PseudoSelectWidget(ipw.VBox):
 
         self.help_info = ipw.HTML(self.NO_ELEMENT_INFO)
         self.reset_select = ipw.Button(
-            description="Reset",
+            description="Unselect All",
             button_style="info",
         )
         self.reset_select.on_click(self._on_reset_click)
@@ -105,6 +105,9 @@ class PseudoSelectWidget(ipw.VBox):
             button_style="info",
         )
         self.select_all.on_click(self._on_select_all_click)
+
+        self.select_buttons = ipw.HBox(children=[self.reset_select, self.select_all])
+        self.select_buttons.layout.visibility = "hidden"
 
         self.multiple_selection = SelectMultipleCheckbox(
             disabled=False, layout=ipw.Layout(width="98%")
@@ -116,7 +119,7 @@ class PseudoSelectWidget(ipw.VBox):
         super().__init__(
             children=[
                 self.help_info,
-                ipw.HBox(children=[self.reset_select, self.select_all]),
+                self.select_buttons,
                 self.multiple_selection,
             ]
         )
@@ -134,6 +137,7 @@ class PseudoSelectWidget(ipw.VBox):
     @traitlets.observe("element")
     def _observe_elements(self, change):
         if change["new"]:
+            self.select_buttons.layout.visibility = "visible"
             # if select/unselect new element update prompt help info
             self.help_info.value = (
                 f"Please choose pseudopotentials of element {self.element} to inspect:"
@@ -155,6 +159,7 @@ class PseudoSelectWidget(ipw.VBox):
         }
 
     def reset(self):
+        self.select_buttons.layout.visibility = "hidden"
         self.help_info.value = self.NO_ELEMENT_INFO
         self.multiple_selection.options = list()
         self.selected_pseudos = {}

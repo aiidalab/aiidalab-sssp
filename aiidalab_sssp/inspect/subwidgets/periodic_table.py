@@ -28,6 +28,7 @@ class PeriodicTable(ipw.VBox):
         self.ptable.observe(self._on_element_select)
 
         # if cache empty run update: first time
+        self.db_version = None
         if os.path.exists(os.path.join(cache_folder, _DB_FOLDER)):
             self._update_db(download=False)
         else:
@@ -45,7 +46,12 @@ class PeriodicTable(ipw.VBox):
         super().__init__(
             children=(
                 self.ptable,
-                db_update,
+                ipw.HBox(
+                    children=[
+                        db_update,
+                        ipw.HTML(f"The SSSP Database version: {self.db_version}"),
+                    ]
+                ),
             ),
             layout=kwargs.get("layout", {}),
         )
@@ -86,6 +92,8 @@ class PeriodicTable(ipw.VBox):
         ]
         self.ptable.disabled_elements = disable_elements
 
+        self.db_version = self._get_db_version(self._cache_folder)
+
     @staticmethod
     def _get_enabled_elements(cache_folder):
         elements = []
@@ -94,6 +102,14 @@ class PeriodicTable(ipw.VBox):
                 elements.append(fn.split(".")[0])
 
         return elements
+
+    @staticmethod
+    def _get_db_version(cache_folder):
+        with open(os.path.join(cache_folder, _DB_FOLDER, "version.txt"), "r") as fh:
+            lines = fh.read()
+            db_version = lines.split("\n")[0].split("=")[1].strip()
+
+        return db_version
 
     @staticmethod
     def _download(cache_folder):

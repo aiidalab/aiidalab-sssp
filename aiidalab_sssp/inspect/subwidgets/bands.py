@@ -60,8 +60,11 @@ class BandStructureWidget(ipw.VBox):
     @traitlets.observe("pseudos")
     def _on_pseeudos_change(self, change):
         if change["new"]:
+            self.layout.visibility = "visible"
             self.pseudo1_select.options = list(self.pseudos.keys())
             self.pseudo2_select.options = list(self.pseudos.keys())
+        else:
+            self.layout.visibility = "hidden"
 
     def _on_pseudo_select(self, _):
         pseudo1_label = self.pseudo1_select.value
@@ -86,7 +89,7 @@ class BandStructureWidget(ipw.VBox):
 
         _band_structure_preview = BandsPlotWidget(
             bands=bands,
-            energy_range={"ymin": -2.0, "ymax": 8.0},
+            energy_range={"ymin": -2.0, "ymax": 11.0},
         )
 
         with self.band_structure:
@@ -113,8 +116,12 @@ class BandChessboard(ipw.VBox):
         )
 
     @traitlets.observe("pseudos")
-    def _on_pseudos_change(self, _):
-        self._render()
+    def _on_pseudos_change(self, change):
+        if change["new"]:
+            self.layout.visibility = "visible"
+            self._render()
+        else:
+            self.layout.visibility = "hidden"
 
     def _render(self):
         """render bands chessboard side by side eta_v and eta_10"""
