@@ -6,6 +6,10 @@ import traitlets
 
 from aiidalab_sssp.inspect import SSSP_DB, parse_label
 
+BASE_DOWNLOAD_URL = (
+    "https://raw.githubusercontent.com/unkcpz/sssp-verify-scripts/main/libraries-pbe"
+)
+
 
 def _load_pseudos(element, db=SSSP_DB) -> dict:
     """Open result json file of element return as dict"""
@@ -32,9 +36,47 @@ class SelectMultipleCheckbox(ipw.VBox):
 
         super().__init__(**kwargs)
 
+    def dw_btn(self, label):
+        """From label generate a redirect button to upf source"""
+        if "dojo.v4-std" in label:
+            lib_folder = "NC-DOJOv4-standard"
+        elif "dojo.v4-str" in label:
+            lib_folder = "NC-DOJOv4-stringent"
+        elif "sg15.v0" in label:
+            lib_folder = "NC-SG15-ONCVPSP4"
+        elif "psl.v0." in label and "paw" in label:
+            lib_folder = "PAW-PSL0.x"
+        elif "psl.v0." in label and "us" in label:
+            lib_folder = "US-PSL0.x"
+        elif "psl.v1.0.0-high" in label and "paw" in label:
+            lib_folder = "PAW-PSL1.0.0-high"
+        elif "psl.v1.0.0-low" in label and "paw" in label:
+            lib_folder = "PAW-PSL1.0.0-low"
+        elif "psl.v1.0.0-high" in label and "us" in label:
+            lib_folder = "US-PSL1.0.0-high"
+        elif "psl.v1.0.0-low" in label and "us" in label:
+            lib_folder = "US-PSL1.0.0-low"
+        elif "jth.v1.1-std" in label:
+            lib_folder = "PAW-JTH1.1-standard"
+        elif "jth.v1.1-str" in label:
+            lib_folder = "PAW-JTH1.1-stringent"
+        elif "gbrv" in label:
+            lib_folder = "US-GBRV-1.x"
+        else:
+            lib_folder = "UNCATOGRIZED"
+
+        btn = ipw.HTML(
+            f"""<a href="{BASE_DOWNLOAD_URL}/{lib_folder}/{label}.upf" target="_blank">➥</a>"""
+        )
+
+        return btn
+
     def _update_checkbox_group(self):
         # Update the checkbox widgets view
-        self.children = list(self.checkbox_dict.values())
+        self.children = [
+            ipw.HBox(children=[v, self.dw_btn(k)], layout=ipw.Layout(width="55%"))
+            for k, v in self.checkbox_dict.items()
+        ]
 
         # Since all checkboxes are recreated set the observe for all of them
         for checkbox in self.checkbox_dict.values():
