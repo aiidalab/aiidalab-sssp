@@ -8,10 +8,15 @@ from aiidalab_sssp.inspect import _px, cmap, parse_label
 from aiidalab_sssp.inspect.subwidgets.summary import SummaryWidget
 
 
-def get_threshold(property_name):
-    """Get threshold for plot from protocol"""
-    protocol = get_protocol("criteria", "efficiency")
-    threshold = max(protocol[property_name]["bounds"])
+def get_threshold(property_name) -> dict:
+    """Get threshold for plot from protocol
+
+    return a dict of upper bound of criteria
+    """
+    protocol = get_protocol("criteria")
+    threshold = {}
+    for key, value in protocol.items():
+        threshold[key] = max(value[property_name]["bounds"])
 
     return threshold
 
@@ -67,10 +72,10 @@ property_map = {
         "ylabel": "Relative error (%)",
         "threshold": get_threshold("delta"),
     },
-    "Delta (Raw value, meV/atom)": {
+    "Delta (Raw value, meV/cell)": {
         "name": "delta",
         "measure": "delta",
-        "ylabel": r"$\Delta$ value (meV/atom)",
+        "ylabel": r"$\Delta$ value (meV/cell)",
     },
 }
 
@@ -89,6 +94,9 @@ class ConvergenceWidget(ipw.VBox):
         )
         self.property_select.observe(self._on_property_select_change, names="value")
         self.summary = SummaryWidget()
+        self.summary.observe(
+            self._on_summary_criteria_change, names="selected_criteria"
+        )
         ipw.dlink((self, "pseudos"), (self.summary, "pseudos"))
 
         self.out = ipw.Output()  # out figure
@@ -122,6 +130,11 @@ class ConvergenceWidget(ipw.VBox):
                 self.convergence_accordion,
             ]
         )
+
+    def _on_summary_criteria_change(self, change):
+        """When select new criteria on summary widget"""
+        if change["new"]:
+            self._render()
 
     @traitlets.observe("pseudos")
     def _on_pseudos_change(self, change):
@@ -208,7 +221,8 @@ class ConvergenceWidget(ipw.VBox):
         ax_rho.set_title("Convergence test at fixed wavefunction cutoff")
         ax_rho.legend(loc="upper right", prop={"size": 6})
 
-        threshold = property_map[property].get("threshold", None)
+        _criteria = str.lower(self.summary.selected_criteria)
+        threshold = property_map[property].get("threshold", {}).get(_criteria, None)
         if threshold:
             ax_wfc.axhline(y=threshold, color="r", linestyle="--")
             ax_rho.axhline(y=threshold, color="r", linestyle="--")

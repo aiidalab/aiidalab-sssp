@@ -13,11 +13,20 @@ class SummaryWidget(ipw.VBox):
     """Summary of verification"""
 
     pseudos = traitlets.Dict(allow_none=True)
+    selected_criteria = traitlets.Unicode()
 
     def __init__(self):
         # Delta mesure
         self.accuracy_summary = ipw.Output()
         self.convergence_summary = ipw.Output()
+
+        self.toggle_criteria = ipw.ToggleButtons(
+            options=["Efficiency", "Precision"],
+            value="Efficiency",
+            tooltip="Toggle to switch criteria.",
+        )
+        self.toggle_criteria.observe(self._on_toggle_criteria_change)
+        ipw.dlink((self.toggle_criteria, "value"), (self, "selected_criteria"))
 
         self._show_rho = False
         self._show_dual = False
@@ -36,6 +45,9 @@ class SummaryWidget(ipw.VBox):
             children=[
                 self.accuracy_summary,
                 self.convergence_summary,
+                ipw.HTML("<p> Switch criteria to: </p>"),
+                self.toggle_criteria,
+                ipw.HTML("<p> Show ρ or dual </p>"),
                 self.toggle_show_dual_or_rho,
             ],
         )
@@ -50,6 +62,11 @@ class SummaryWidget(ipw.VBox):
         else:
             self._show_dual = False
             self._show_rho = False
+        with self.convergence_summary:
+            clear_output(wait=True)
+            display(self._render_convergence())
+
+    def _on_toggle_criteria_change(self, _):
         with self.convergence_summary:
             clear_output(wait=True)
             display(self._render_convergence())
@@ -94,6 +111,10 @@ class SummaryWidget(ipw.VBox):
             _data = pseudo_out["convergence"]
             cutoffs = []
             for prop in prop_list:
+                # We didn't not relly run the convergence on rho at precision criteria
+                # The trick here is the wft cutoff of rho cutoff is write and used,
+                # The dual is from wfccut/rhocut of efficiency criteria, and also applied to
+                # precision results display. The rhocut is derived then from rhocut=wfccut * dual.
                 wfc_cutoff = (
                     _data.get(prop, {})
                     .get("output_parameters", {})
@@ -104,19 +125,37 @@ class SummaryWidget(ipw.VBox):
                     .get("output_parameters", {})
                     .get("chargedensity_cutoff", None)
                 )
-                wfc_cutoff = int(wfc_cutoff) if wfc_cutoff else None
-                rho_cutoff = int(rho_cutoff) if rho_cutoff else None
+                wfc_cutoff = int(wfc_cutoff) if wfc_cutoff else "nan"
+                rho_cutoff = int(rho_cutoff) if rho_cutoff else "nan"
+                # compute dual. The dual is same for both precision and efficiency
+                try:
+                    dual = round(rho_cutoff / wfc_cutoff, 1)
+                except Exception:
+                    dual = "nan"
 
-                if not wfc_cutoff:
-                    cutoffs.append(str("nan"))
-                    continue
+                # if checking precision, update cutoff pair first
+                if self.toggle_criteria.value == "Precision":
+                    wfc_cutoff = (
+                        _data.get(prop, {})
+                        .get("output_parameters", {})
+                        .get("all_criteria_wavefunction_cutoff", {})
+                        .get("precision", None)
+                    )
+                    wfc_cutoff = int(wfc_cutoff) if wfc_cutoff else "nan"
+                    try:
+                        rho_cutoff = int(wfc_cutoff * dual)
+                    except Exception:
+                        rho_cutoff = "nan"
+
+                    if not wfc_cutoff:
+                        cutoffs.append(str("nan"))
+                        continue
 
                 # not allow to show at the same time
                 assert not (self._show_dual and self._show_rho)
                 if self._show_rho:
                     cutoffs.append(f"{wfc_cutoff} ({rho_cutoff})")
                 elif self._show_dual:
-                    dual = round(rho_cutoff / wfc_cutoff, 1)
                     cutoffs.append(f"{wfc_cutoff} ({dual})")
                 else:
                     cutoffs.append(f"{wfc_cutoff}")
