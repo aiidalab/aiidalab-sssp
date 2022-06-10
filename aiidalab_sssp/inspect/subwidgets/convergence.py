@@ -1,36 +1,76 @@
 import ipywidgets as ipw
 import traitlets
+from aiida_sssp_workflow.utils import get_protocol
 from IPython.display import clear_output, display
 from matplotlib import pyplot as plt
 
 from aiidalab_sssp.inspect import _px, cmap, parse_label
 from aiidalab_sssp.inspect.subwidgets.summary import SummaryWidget
 
+
+def get_threshold(property_name):
+    """Get threshold for plot from protocol"""
+    protocol = get_protocol("criteria", "efficiency")
+    threshold = max(protocol[property_name]["bounds"])
+
+    return threshold
+
+
 property_map = {
-    "Cohesive energy": {
+    "Cohesive energy (Absolute Error, meV/atom)": {
         "name": "cohesive_energy",
         "measure": "absolute_diff",
         "ylabel": "Absolute error per atom (meV/atom)",
+        "threshold": get_threshold("cohesive_energy"),
     },
-    "Phonon frequencies": {
+    "Cohesive energy (Raw Energy, meV/atom)": {
+        "name": "cohesive_energy",
+        "measure": "cohesive_energy_per_atom",
+        "ylabel": "Cohesive energy per atom (meV/atom)",
+    },
+    "Phonon frequencies (Relative Error, %)": {
         "name": "phonon_frequencies",
         "measure": "relative_diff",
         "ylabel": "Relative error (%)",
+        "threshold": get_threshold("phonon_frequencies"),
     },
-    "Pressure": {
+    "Phonon frequencies (Max freq error, cm-1)": {
+        "name": "phonon_frequencies",
+        "measure": "absolute_max_diff",
+        "ylabel": "Max frequencies error, cm-1",
+    },
+    "Phonon frequencies (Max frequencies, cm-1)": {
+        "name": "phonon_frequencies",
+        "measure": "omega_max",
+        "ylabel": "Max frequencies, cm-1",
+    },
+    "Pressure (Relative Error, %)": {
         "name": "pressure",
         "measure": "relative_diff",
         "ylabel": "Relative error (%)",
+        "threshold": get_threshold("pressure"),
     },
-    "Bands distance": {
+    "Bands distance (Avg. error meV)": {
         "name": "bands",
         "measure": "eta_c",
-        "ylabel": r"$Error of \eta_c (meV)$",
+        "ylabel": r"$Avg. Error of \eta_c (meV)$",
+        "threshold": get_threshold("bands"),
     },
-    "Delta": {
+    "Bands distance (Max. error meV)": {
+        "name": "bands",
+        "measure": "max_diff_c",
+        "ylabel": r"$Max Error of \eta_v (meV)$",
+    },
+    "Delta (Relative Error, %)": {
         "name": "delta",
         "measure": "relative_diff",
         "ylabel": "Relative error (%)",
+        "threshold": get_threshold("delta"),
+    },
+    "Delta (Raw value, meV/atom)": {
+        "name": "delta",
+        "measure": "delta",
+        "ylabel": r"$\Delta$ value (meV/atom)",
     },
 }
 
@@ -44,14 +84,8 @@ class ConvergenceWidget(ipw.VBox):
         # using raido button widget so user only choose one proper to check
         # at one time. It can be more, but pollute the UX and not useful.
         self.property_select = ipw.RadioButtons(
-            options=[
-                "Cohesive energy",
-                "Phonon frequencies",
-                "Pressure",
-                "Delta",
-                "Bands distance",
-            ],
-            value="Cohesive energy",
+            options=list(property_map.keys()),
+            value=list(property_map.keys())[0],
         )
         self.property_select.observe(self._on_property_select_change, names="value")
         self.summary = SummaryWidget()
@@ -164,9 +198,10 @@ class ConvergenceWidget(ipw.VBox):
         ax_rho.set_title("Convergence test at fixed wavefunction cutoff")
         ax_rho.legend(loc="upper right", prop={"size": 6})
 
-        # if threshold:
-        #     ax_wfc.axhline(y=threshold, color="r", linestyle="--")
-        #     ax_rho.axhline(y=threshold, color="r", linestyle="--")
+        threshold = property_map[property].get("threshold", None)
+        if threshold:
+            ax_wfc.axhline(y=threshold, color="r", linestyle="--")
+            ax_rho.axhline(y=threshold, color="r", linestyle="--")
 
         #     ax_wfc.set_ylim(-0.5 * threshold, 10 * threshold)
         #     ax_rho.set_ylim(-0.5 * threshold, 10 * threshold)
