@@ -94,31 +94,41 @@ class ConvergenceWidget(ipw.VBox):
         self.out = ipw.Output()  # out figure
         self.convergence = ipw.VBox(
             children=[
-                self.summary,
                 self.property_select,
                 self.out,
             ],
         )
 
-        self.accordion = ipw.Accordion(children=[self.convergence], selected_index=None)
-        self.accordion.set_title(
+        self.summary_accordion = ipw.Accordion(
+            children=[self.summary], selected_index=None
+        )
+        self.summary_accordion.set_title(
+            0, "Toggle to show the summary of verification results."
+        )
+        self.convergence_accordion = ipw.Accordion(
+            children=[self.convergence], selected_index=None
+        )
+        self.convergence_accordion.set_title(
             0, "Toggle to show the detailed convergence verification results."
         )
-        self.accordion.observe(self._on_accordion_change, names="selected_index")
+        self.convergence_accordion.observe(
+            self._on_convergence_accordion_change, names="selected_index"
+        )
 
         super().__init__(
             children=[
                 ipw.HTML("<h2> Convergence results </h2>"),
-                self.accordion,
+                self.summary_accordion,
+                self.convergence_accordion,
             ]
         )
 
     @traitlets.observe("pseudos")
     def _on_pseudos_change(self, change):
         """only update plot when accordion open"""
-        self.accordion.selected_index = None
+        self.convergence_accordion.selected_index = None
 
-    def _on_accordion_change(self, change):
+    def _on_convergence_accordion_change(self, change):
         # only render when accordion open up
         if change["new"] == 0:
             self._render()

@@ -51,7 +51,7 @@ class BandStructureWidget(ipw.VBox):
 
         super().__init__(
             children=[
-                ipw.HTML("<h2> Band Sructure </h2>"),
+                ipw.HTML("<h2> Band Structure </h2>"),
                 ipw.HBox(children=[self.pseudo1_select, self.pseudo2_select]),
                 self.band_structure,
             ],
