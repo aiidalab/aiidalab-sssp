@@ -36,7 +36,8 @@ def fermi_dirac(band_energy, fermi_energy, smearing):
 
 def retrieve_bands(
     bandsdata: dict,  # bands, kpoints, weights -> corresponding array
-    start_band,
+    start_band_idx,
+    num_bands,
     num_electrons,
     smearing,
     do_smearing,
@@ -62,7 +63,7 @@ def retrieve_bands(
 
     # update bands shift to fermi_level
     bands = bands - bandsdata["fermi_level"]  # shift all bands to fermi energy 0
-    bands = bands[:, start_band:]
+    bands = bands[:, start_band_idx : start_band_idx + num_bands]
     bandsdata["bands"] = bands
 
     # update fermi_level
@@ -178,25 +179,43 @@ def get_bands_distance(
         bandsdata_a[key] = np.asarray(bandsdata_a[key])
         bandsdata_b[key] = np.asarray(bandsdata_b[key])
 
-    num_electrons_a = bandsdata_a["number_of_electrons"]
-    num_electrons_b = bandsdata_b["number_of_electrons"]
+    if bandsdata_b["number_of_electrons"] > bandsdata_a["number_of_electrons"]:
+        # swap to make sure a is less electrons pseudo
+        bandsdata_a, bandsdata_b = bandsdata_b, bandsdata_a
 
     assert (
-        not num_electrons_a > num_electrons_b
-    ), "Need to be less num_electrons result as argument labeled 'a'."
+        not bandsdata_a["number_of_electrons"] > bandsdata_b["number_of_electrons"]
+    ), "Need to be less num_bands result as argument labeled 'a'."
 
-    num_electrons = int(num_electrons_a)
-    bandsdata_a = retrieve_bands(bandsdata_a, 0, num_electrons, smearing, do_smearing)
+    num_electrons_a = int(bandsdata_a["number_of_electrons"])
+    num_electrons_b = int(bandsdata_b["number_of_electrons"])
 
     # divide by 2 is valid for both spin and non-spin bands, since for spin I concatenate the bands
     # the number of bands is half of electrons
-    start_band = int(num_electrons_b - num_electrons_a) // 2
+    band_b_start_band = int(num_electrons_a - num_electrons_b) // 2
+
+    num_bands_a = bandsdata_a["number_of_bands"]
+    num_bands_b = bandsdata_b["number_of_bands"] - band_b_start_band
+
+    num_bands = min(num_bands_a, num_bands_b)
+
+    bandsdata_a = retrieve_bands(
+        bandsdata_a, 0, num_bands, num_electrons_a, smearing, do_smearing
+    )
+
     bandsdata_b = retrieve_bands(
-        bandsdata_b, start_band, num_electrons, smearing, do_smearing
+        bandsdata_b,
+        band_b_start_band,
+        num_bands,
+        num_electrons_b,
+        smearing,
+        do_smearing,
     )
 
     # after cut and aligh in retrive band, the shapes are same now
-    assert np.shape(bandsdata_a["bands"]) == np.shape(bandsdata_b["bands"])
+    assert np.shape(bandsdata_a["bands"]) == np.shape(
+        bandsdata_b["bands"]
+    ), f'{np.shape(bandsdata_a["bands"])} != {np.shape(bandsdata_b["bands"])}'
 
     # eta_v
     fermi_shift_v = 0.0
@@ -208,9 +227,11 @@ def get_bands_distance(
     outputs = calculate_eta_and_max_diff(
         bandsdata_a, bandsdata_b, fermi_shift_v, smearing_v
     )
-    eta_v = outputs.get("eta")
-    shift_v = outputs.get("shift")
-    max_diff_v = outputs.get("max_diff")
+
+    _eV_to_mev = 1000
+    eta_v = outputs.get("eta") * _eV_to_mev
+    shift_v = outputs.get("shift") * _eV_to_mev
+    max_diff_v = outputs.get("max_diff") * _eV_to_mev
 
     # eta_c
     # if not metal
@@ -219,9 +240,9 @@ def get_bands_distance(
         bandsdata_a, bandsdata_b, fermi_shift, smearing_c
     )
 
-    eta_c = outputs.get("eta")
-    shift_c = outputs.get("shift")
-    max_diff_c = outputs.get("max_diff")
+    eta_c = outputs.get("eta") * _eV_to_mev
+    shift_c = outputs.get("shift") * _eV_to_mev
+    max_diff_c = outputs.get("max_diff") * _eV_to_mev
 
     return {
         "eta_v": eta_v,
@@ -230,4 +251,5 @@ def get_bands_distance(
         "eta_c": eta_c,
         "shift_c": shift_c,
         "max_diff_c": max_diff_c,
+        "units": "meV",
     }

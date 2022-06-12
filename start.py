@@ -11,9 +11,8 @@ template = """
     </a>
   </ul></td>
   <td valign="top"><ul>
-    <li><a href="{appbase}/verification.ipynb" target="_blank">Running SSSP Verification (beta)</a></li>
-    <li><a href="{appbase}/inspect.ipynb" target="_blank"> Inspect and Compare Verification Results (alpha)</a></li>
-    <li><a href="{appbase}/bands-distance.ipynb" target="_blank"> Compare Bands Distance (dev)</a></li>
+    <li><a href="{appbase}/verification.ipynb" target="_blank">Running SSSP Verification (post0)</a></li>
+    <li><a href="{appbase}/inspect.ipynb" target="_blank"> Inspect and Compare Verification Results (post0)</a></li>
   </ul></td>
 </tr>
 </table>
