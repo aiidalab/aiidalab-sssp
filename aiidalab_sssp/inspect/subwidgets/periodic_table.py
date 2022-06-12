@@ -72,8 +72,7 @@ class PeriodicTable(ipw.VBox):
                         self.ptable.selected_elements = {element: 0}
                         self.selected_element = element
                     else:
-                        self.ptable.selected_elements = {}
-                        self.selected_element = None
+                        self.reset()
                     # To have the correct 'last' value for next calls
                     self._last_selected = self.ptable.selected_elements
                 else:
@@ -91,8 +90,9 @@ class PeriodicTable(ipw.VBox):
             e for e in self.ptable.allElements if e not in self.elements
         ]
         self.ptable.disabled_elements = disable_elements
-
         self.db_version = self._get_db_version(self._cache_folder)
+
+        self.reset()
 
     @staticmethod
     def _get_enabled_elements(cache_folder):
@@ -140,7 +140,7 @@ class PeriodicTable(ipw.VBox):
     def value(self) -> dict:
         """Return value for wrapped PTableWidget"""
 
-        return not self.select_any_all.value, self.ptable.selected_elements.copy()
+        return self.ptable.selected_elements.copy()
 
     @property
     def disabled(self) -> None:
@@ -153,11 +153,8 @@ class PeriodicTable(ipw.VBox):
         if not isinstance(value, bool):
             raise TypeError("disabled must be a boolean")
 
-        self.select_any_all.disabled = self.ptable.disabled = value
-
     def reset(self):
         """Reset widget"""
-        self.select_any_all.value = False
         self.ptable.selected_elements = {}
         self.selected_element = None
 
