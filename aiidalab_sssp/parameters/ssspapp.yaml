@@ -10,11 +10,11 @@ pressure_convergence: true
 delta_convergence: true
 bands_convergence: true
 
-## Codes
-ph_code: ph-6.7@localhost
-pw_code: pw-6.7@localhost
+## Codes not set in default ask user to set cluster
+# ph_code: ph-6.7@localhost
+# pw_code: pw-6.7@localhost
 
 ## Calculation settings
-protocol: theos
+protocol: acwf
 criteria: efficiency
-quick_run: false
+calc_type: standard

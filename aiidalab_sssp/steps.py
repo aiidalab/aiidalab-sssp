@@ -6,7 +6,7 @@ import ipywidgets as ipw
 import traitlets
 from aiida import orm
 from aiida.common import NotExistent
-from aiida.engine import ProcessState, submit
+from aiida.engine import ProcessState
 from aiida.orm import Node, ProcessNode, load_code
 from aiida.plugins import DataFactory, WorkflowFactory
 from aiida_sssp_workflow.utils import helper_parse_upf
@@ -21,7 +21,6 @@ from aiidalab_widgets_base import (
 from IPython.display import clear_output, display
 
 from aiidalab_sssp.parameters import DEFAULT_PARAMETERS
-from aiidalab_sssp.setup_codes import QESetupWidget
 
 UpfData = DataFactory("pseudo.upf")
 VerificationWorkChain = WorkflowFactory("sssp_workflow.verification")
@@ -164,16 +163,24 @@ class PseudoSelectionStep(ipw.VBox, WizardAppWidgetStep):
 
 class WorkChainSettings(ipw.VBox):
 
-    protocol_help = ipw.HTML(
+    calc_type_help = ipw.HTML(
         """<div style="line-height: 140%; padding-top: 6px; padding-bottom: 0px">
-        The protocol setup the parameters used for pseudopotential
-        verification. The criteria determine when the wavefunction and
-        charge density cutoff tests are converged.
-        The "THEOS" calculation protocol represents a set of parameters compatible
+        The acwf protocol is used to set the parameters used for pseudopotential
+        verification.
+        The acwf calculation protocol represents a set of parameters compatible
         with aiida-common-workflow.
+        Three different calculation type are provided for verification,
+        <ol style="list-style-type:none">
+            <li style="padding-top: 2px; padding-bottom: 2px;">⚙️ <b>Standard:</b> production mode that run verification on a thourgh cutoff test.</li>
+            <li style="padding-top: 2px; padding-bottom: 2px;">⚙️ <b>Quick:</b> quick mode is design to run quickly with sparse cutoff test sample points.</li>
+            <li style="padding-top: 2px; padding-bottom: 2px;">🔍  <b>Precheck:</b> precheck is for running a pre-check verification to decide whether 200 Ry as reference is enough if not it is not valuable to run futher verification on smaller cutoff and whether small referece cutoff can be used for production verification.</li>
+        </ol>
+        The criteria determine when the wavefunction and
+        charge density cutoff tests are converged.
         Choose the "efficiency" protocol for cutoff test to give a efficiency
         pseudopotential. The "precision" protocol that provides more
-        accuracy pseudopotential but will take longer.</div>"""
+        accuracy pseudopotential but will take longer.
+        </div>"""
     )
     properties_list = traitlets.List()
 
@@ -245,22 +252,15 @@ class WorkChainSettings(ipw.VBox):
 
         self.properties_list = DEFAULT_PROPERTIES_LIST
 
-        # Work chain protocol
-        self.protocol = ipw.ToggleButtons(
-            options=["theos", "demo"],
-            value="theos",
+        # Work chain calc_type
+        self.calc_type = ipw.ToggleButtons(
+            options=["standard", "quick", "precheck"],
+            value="standard",
         )
 
         self.criteria = ipw.ToggleButtons(
             options=["efficiency", "precision"],
             value="efficiency",
-        )
-        self.quick_run = ipw.Checkbox(
-            desciption="",
-            tooltip="Tick so can run without cluster.",
-            indent=False,
-            value=False,
-            layout=ipw.Layout(max_width="10%"),
         )
 
         super().__init__(
@@ -305,23 +305,15 @@ class WorkChainSettings(ipw.VBox):
                         self.bands_convergence,
                     ]
                 ),
-                # protocol setup
+                # calculation type setup
+                self.calc_type_help,
                 ipw.HTML(
-                    "Select protocol:",
+                    "Select calculation type:",
                     layout=ipw.Layout(flex="1 1 auto"),
                 ),
-                self.protocol,
+                self.calc_type,
                 ipw.HTML("Select criteria:", layout=ipw.Layout(flex="1 1 auto")),
                 self.criteria,
-                self.protocol_help,
-                ipw.HBox(
-                    children=[
-                        self.quick_run,
-                        ipw.HTML(
-                            "<b>QUICK RUN: Low max cuoff and sparse cutoff list therefore local resource tolerant.</b>"
-                        ),
-                    ]
-                ),
             ],
             **kwargs,
         )
@@ -329,25 +321,25 @@ class WorkChainSettings(ipw.VBox):
     def _update_properties_list(self, _):
         lst = []
         if self.delta_measure.value:
-            lst.append("accuracy:delta")
+            lst.append("accuracy.delta")
 
         if self.bands_measure.value:
-            lst.append("accuracy:bands")
+            lst.append("accuracy.bands")
 
         if self.cohesive_energy_convergence.value:
-            lst.append("convergence:cohesive_energy")
+            lst.append("convergence.cohesive_energy")
 
         if self.phonon_frequencies_convergence.value:
-            lst.append("convergence:phonon_frequencies")
+            lst.append("convergence.phonon_frequencies")
 
         if self.pressure_convergence.value:
-            lst.append("convergence:pressure")
+            lst.append("convergence.pressure")
 
         if self.delta_convergence.value:
-            lst.append("convergence:delta")
+            lst.append("convergence.delta")
 
         if self.bands_convergence.value:
-            lst.append("convergence:bands")
+            lst.append("convergence.bands")
 
         self.properties_list = lst
 
@@ -421,9 +413,8 @@ class ConfigureSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
             self.workchain_settings.bands_convergence.value = parameters[
                 "bands_convergence"
             ]
-            self.workchain_settings.protocol.value = parameters["protocol"]
             self.workchain_settings.criteria.value = parameters["criteria"]
-            self.workchain_settings.quick_run.value = parameters["quick_run"]
+            self.workchain_settings.calc_type.value = parameters["standard"]
 
     def _update_state(self, _=None):
         if self.previous_step_state == self.State.SUCCESS:
@@ -721,15 +712,19 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
 
     _submission_blockers = traitlets.List(traitlets.Unicode)
 
+    # Since for production it is now the only protocol
+    _PROTOCOL = "acwf"
+
     codes_title = ipw.HTML(
         """<div style="padding-top: 0px; padding-bottom: 0px">
         <h4>Codes</h4></div>"""
     )
     codes_help = ipw.HTML(
         """<div style="line-height: 140%; padding-top: 0px; padding-bottom:
-        10px"> Select the code to use for running the calculations. The codes
-        on the local machine (localhost) are installed by default, but you can
-        configure new ones on potentially more powerful machines by clicking on
+        10px"> Select the code to use for running the calculations. Please
+        setup to run verification on the cluster with more than 16 cores.
+        Otherwise the localhost resource will fully occupied and stuck. You can
+        configure new ones on machines by clicking on
         "Setup new code".</div>"""
     )
 
@@ -764,17 +759,7 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
 
         self.submit_button.on_click(self._on_submit_button_clicked)
 
-        # The QE setup widget checks whether there are codes that match specific
-        # expected labels (e.g. "pw-6.7@localhost") and triggers both the
-        # installation of QE into a dedicated conda environment and the setup of
-        # the codes in case that they are not already configured.
-        self.qe_setup_status = QESetupWidget()
-        self.qe_setup_status.observe(self._update_state, "busy")
-        self.qe_setup_status.observe(self._toggle_install_widgets, "installed")
-        self.qe_setup_status.observe(self._auto_select_code, "installed")
-
         # After all self variable set
-        self.set_selected_codes(DEFAULT_PARAMETERS)
         self.set_resource_defaults()
 
         super().__init__(
@@ -785,7 +770,6 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
                 self.ph_code,
                 self.resources_config,
                 self.parallelization,
-                self.qe_setup_status,
                 self._submission_blocker_messages,
                 self.submit_button,
             ],
@@ -857,22 +841,6 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
                 except NotExistent:
                     pass
 
-    def set_selected_codes(self, parameters):
-        """Set the inputs in the GUI based on a set of parameters."""
-
-        # Codes
-        def _load_code(code):
-            if code is not None:
-                try:
-                    return load_code(code)
-                except NotExistent:
-                    return None
-
-        with self.hold_trait_notifications():
-            # Codes
-            self.pw_code.value = _load_code(parameters["pw_code"])
-            self.ph_code.value = _load_code(parameters["ph_code"])
-
     def submit(self):
         """Run the workflow to calculate delta factor"""
         builder = VerificationWorkChain.get_builder()
@@ -881,13 +849,9 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
         builder.pw_code = self.pw_code.value
         builder.ph_code = self.ph_code.value
 
-        builder.protocol = orm.Str(self.workchain_settings.protocol.value)
+        builder.protocol = orm.Str(self._PROTOCOL)
         builder.criteria = orm.Str(self.workchain_settings.criteria.value)
-        builder.cutoff_control = (
-            orm.Str("demo")  # FIXME demo only for dev, should be `quick` in production
-            if self.workchain_settings.quick_run.value
-            else orm.Str("cluster")
-        )
+        builder.cutoff_control = orm.Str(self.workchain_settings.calc_type.value)
         builder.properties_list = orm.List(list=self.workchain_settings.properties_list)
 
         builder.options = orm.Dict(
@@ -917,18 +881,18 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
 
         builder.label = orm.Str(label)
 
-        # print("properties_list:", builder.properties_list.get_list())
-        # print("protocol:", builder.protocol.value)
-        # print("criteria:", builder.criteria.value)
-        # print("cutoff_control:", builder.cutoff_control.value)
-        # print("options:", builder.options.get_dict())
-        # print("parallelization:", builder.parallelization.get_dict())
-        # print("clean_workdir_level:", builder.clean_workdir_level.value)
-        # print("label:", builder.label.value)
+        print("properties_list:", builder.properties_list.get_list())
+        print("protocol:", builder.protocol.value)
+        print("criteria:", builder.criteria.value)
+        print("cutoff_control:", builder.cutoff_control.value)
+        print("options:", builder.options.get_dict())
+        print("parallelization:", builder.parallelization.get_dict())
+        print("clean_workdir_level:", builder.clean_workdir_level.value)
+        print("label:", builder.label.value)
 
-        self.process = submit(builder)
+        # self.process = submit(builder)
 
-        self.process.description = self.metadata_settings.description.value
+        # self.process.description = self.metadata_settings.description.value
 
     def _on_submit_button_clicked(self, _):
         self.submit_button.disabled = True
