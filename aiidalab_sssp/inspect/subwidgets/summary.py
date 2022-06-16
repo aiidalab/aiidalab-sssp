@@ -92,9 +92,16 @@ class SummaryWidget(ipw.VBox):
         columns = ["Pseudopotential label"] + conf_list
         for label, pseudo_out in self.pseudos.items():
             _data = pseudo_out["accuracy"]["delta"]["output_parameters"]
-            nu_list = [
-                round(_data.get(i, {}).get("nu/natoms", None), 3) for i in conf_list
-            ]
+            nu_list = []
+            for i in conf_list:
+                nu = _data.get(i, {}).get("nu/natoms", None)
+                if nu:
+                    nu_list.append(round(nu, 3))
+                else:
+                    # there is no delta/nu result for this conf of this pseudo
+                    # print("Cannot find nu value of pseudo={label}, conf={i}")
+                    # it will show in summary table as 'nan'
+                    nu_list.append("nan")
 
             output_label = parse_label(label)["representive_label"]
             rows.append([output_label, *nu_list])
