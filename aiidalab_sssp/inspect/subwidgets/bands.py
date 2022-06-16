@@ -61,8 +61,10 @@ class BandStructureWidget(ipw.VBox):
     def _on_pseeudos_change(self, change):
         if change["new"]:
             self.layout.visibility = "visible"
-            self.pseudo1_select.options = list(self.pseudos.keys())
-            self.pseudo2_select.options = list(self.pseudos.keys())
+            self.pseudo1_select.options = ["None"] + list(self.pseudos.keys())
+            self.pseudo2_select.options = ["None"] + list(self.pseudos.keys())
+            # The first bands default select the first pseudo
+            self.pseudo1_select.value = list(self.pseudos.keys())[0]
         else:
             self.layout.visibility = "hidden"
 
