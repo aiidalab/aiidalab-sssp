@@ -8,7 +8,7 @@ import traitlets
 from aiida_sssp_workflow.utils import OXIDE_CONFIGURATIONS, UNARIE_CONFIGURATIONS
 from IPython.display import clear_output, display
 
-from aiidalab_sssp.inspect import cmap, extract_element, parse_label
+from aiidalab_sssp.inspect import _px, cmap, extract_element, parse_label
 
 CONFIGURATIONS = OXIDE_CONFIGURATIONS + UNARIE_CONFIGURATIONS + ["RE", "TYPICAL"]
 
@@ -138,7 +138,7 @@ class EosWidget(ipw.VBox):
 
         super().__init__(
             children=[
-                ipw.HTML("<h2> Equation of State Pseudopotential w.r.t AE </h2>"),
+                # ipw.HTML("<h2> Equation of State Pseudopotential w.r.t AE </h2>"),
                 ipw.HBox(children=[self.select_pseudo, self.select_configuration]),
                 self.eos_preview,
             ],
@@ -175,7 +175,7 @@ class EosWidget(ipw.VBox):
         configuration = self.select_configuration.value
 
         data = self.pseudos[label]["accuracy"]["delta"].get(configuration, None)
-        fig, ax = plt.subplots(1, 1)
+        fig, ax = plt.subplots(1, 1, figsize=(440 * _px, 400 * _px))
         fig.canvas.header_visible = False
         self._render_plot(ax, data=data, configuration=configuration)
 
@@ -214,6 +214,8 @@ class EosWidget(ipw.VBox):
         )
 
         # Plot EOS: this will be done anyway
+        ax.tick_params(axis="y", labelsize=6, rotation=45)
+
         ax.plot(volumes, energies, "ob", label="RAW equation of state")
         ax.plot(dense_volumes, ae_eos_fit_energy, "-b", label="AE WIEN2K")
         ax.axvline(V0, linestyle="--", color="gray")
@@ -238,5 +240,5 @@ class EosWidget(ipw.VBox):
         )
 
         ax.legend(loc="upper center")
-        ax.set_xlabel("Cell volume per formula unit ($\\AA^3$)")
-        ax.set_ylabel("$E - TS$ per formula unit (eV)")
+        ax.set_xlabel("Cell volume per formula unit ($\\AA^3$)", fontsize=8)
+        ax.set_ylabel("$E - TS$ per formula unit (eV)", fontsize=8)

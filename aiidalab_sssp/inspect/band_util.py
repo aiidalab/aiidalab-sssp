@@ -179,20 +179,23 @@ def get_bands_distance(
         bandsdata_a[key] = np.asarray(bandsdata_a[key])
         bandsdata_b[key] = np.asarray(bandsdata_b[key])
 
-    if bandsdata_b["number_of_electrons"] > bandsdata_a["number_of_electrons"]:
+    # make sure always less electrons bands as a. b hase more electrons if not equal
+    if not int(bandsdata_b["number_of_electrons"]) >= int(
+        bandsdata_a["number_of_electrons"]
+    ):
         # swap to make sure a is less electrons pseudo
         bandsdata_a, bandsdata_b = bandsdata_b, bandsdata_a
 
-    assert (
-        not bandsdata_a["number_of_electrons"] > bandsdata_b["number_of_electrons"]
-    ), "Need to be less num_bands result as argument labeled 'a'."
+    assert int(bandsdata_b["number_of_electrons"]) >= int(
+        bandsdata_a["number_of_electrons"]
+    ), f"Need to be less num_bands in a {bandsdata_a['number_of_electrons']} than b {bandsdata_b['number_of_electrons']}"
 
     num_electrons_a = int(bandsdata_a["number_of_electrons"])
     num_electrons_b = int(bandsdata_b["number_of_electrons"])
 
     # divide by 2 is valid for both spin and non-spin bands, since for spin I concatenate the bands
     # the number of bands is half of electrons
-    band_b_start_band = int(num_electrons_a - num_electrons_b) // 2
+    band_b_start_band = int(num_electrons_b - num_electrons_a) // 2
 
     num_bands_a = bandsdata_a["number_of_bands"]
     num_bands_b = bandsdata_b["number_of_bands"] - band_b_start_band

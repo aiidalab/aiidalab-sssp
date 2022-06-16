@@ -89,7 +89,7 @@ class BandStructureWidget(ipw.VBox):
 
         _band_structure_preview = BandsPlotWidget(
             bands=bands,
-            energy_range={"ymin": -10.0, "ymax": 11.0},
+            energy_range={"ymin": -30.0, "ymax": 11.0},
         )
 
         with self.band_structure:
