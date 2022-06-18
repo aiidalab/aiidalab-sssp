@@ -65,6 +65,7 @@ def parse_label(label):
         "version": version,
         "representive_label": f"{z}|{full_type}|{family}|{tool}|{version}",
         "concise_label": f"{z}|{type}|{family}|{version}",
+        "full_label": f"{element}|{z}|{full_type}|{family}|{tool}|{version}",
     }
 
 

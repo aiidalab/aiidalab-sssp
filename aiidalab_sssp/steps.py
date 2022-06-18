@@ -29,7 +29,7 @@ VerificationWorkChain = WorkflowFactory("sssp_workflow.verification")
 class PseudoUploadWidget(ipw.VBox):
     """Class that allows to upload pseudopotential from user's computer."""
 
-    file_pseudo = traitlets.Tuple()
+    pseudo = traitlets.Tuple()
     error_message = traitlets.Unicode()
 
     def __init__(self, title="", description="Upload Pseudopotential"):
@@ -55,7 +55,7 @@ Supported pseudo formats (Now only support UPF type)
 
             # Order matters make sure when pseudo change
             # the pseudo_filename is set
-            self.file_pseudo = (fname, UpfData(io.BytesIO(content)))
+            self.pseudo = (fname, UpfData(io.BytesIO(content)))
         except ValueError:
             self.error_message = (
                 "wrong pseudopotential file type. (Only UPF support now)"
@@ -67,13 +67,12 @@ class PseudoSelectionStep(ipw.VBox, WizardAppWidgetStep):
     Upload a pesudopotential and store it as UpfData in database
     """
 
-    pseudo = traitlets.Instance(UpfData, allow_none=True)
-    pseudo_filename = traitlets.Unicode(allow_none=True)
-    confirmed_pseudo = traitlets.Instance(UpfData, allow_none=True)
+    pseudo = traitlets.Tuple()
+    confirmed_pseudo = traitlets.Tuple()
 
     def __init__(self, **kwargs):
         self.pseudo_upload = PseudoUploadWidget()
-        self.pseudo_upload.observe(self._observe_pseudo_upload, "file_pseudo")
+        self.pseudo_upload.observe(self._observe_pseudo_upload, "pseudo")
 
         self.description = ipw.HTML(
             """
@@ -414,7 +413,7 @@ class ConfigureSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
                 "bands_convergence"
             ]
             self.workchain_settings.criteria.value = parameters["criteria"]
-            self.workchain_settings.calc_type.value = parameters["standard"]
+            self.workchain_settings.calc_type.value = parameters["calc_type"]
 
     def _update_state(self, _=None):
         if self.previous_step_state == self.State.SUCCESS:
@@ -467,13 +466,14 @@ class MetadataSettings(ipw.VBox):
     stored.
 
     Currently the primary key simply a string has the format:
-        <element>/<psp_type>/<psp_family>/<psp_version>/<psp_extra_label>
+        <element>.<psp_type>.<z_valence>.<psp_tool>.<psp_family>.<psp_version>.<psp_extra_label>
 
     In the future this should be a formatted class of data that can be used
     to identify the pseudopotentials.
     """
 
-    pseudo_filename = traitlets.Unicode(allow_none=True)
+    pseudo = traitlets.Tuple()
+    output_label = traitlets.Unicode()
 
     def __init__(self, **kwargs):
         extra = {
@@ -481,21 +481,31 @@ class MetadataSettings(ipw.VBox):
             "layout": {"min_width": "310px"},
         }
 
-        self.psp_family = ipw.Text(
+        self.family = ipw.Text(
             placeholder="Unresolved",
-            description="Pseudopotential type:",
+            description="Pseudopotential family:",
             **extra,
         )
-        self.psp_version = ipw.Text(
+        self.gen_tool = ipw.Text(
+            placeholder="Unresolved",
+            description="Pseudopotential tool:",
+            **extra,
+        )
+        self.version = ipw.Text(
             placeholder="Unresolved",
             description="Pseudopotential version:",
             **extra,
         )
-        self.psp_extra_label = ipw.Text(
+        self.extra = ipw.Text(
             placeholder="Optional",
             description="Pseudopotential extra label:",
             **extra,
         )
+
+        self.family.observe(self._on_tag_change)
+        self.gen_tool.observe(self._on_tag_change)
+        self.version.observe(self._on_tag_change)
+        self.extra.observe(self._on_tag_change)
 
         self.description = ipw.Textarea(
             placeholder="Optional",
@@ -505,29 +515,57 @@ class MetadataSettings(ipw.VBox):
 
         super().__init__(
             children=[
-                self.psp_family,
-                self.psp_version,
-                self.psp_extra_label,
+                self.family,
+                self.gen_tool,
+                self.version,
+                self.extra,
                 self.description,
             ],
             **kwargs,
         )
 
+    def _on_tag_change(self, _):
+        """family/gen_tool/version/extra change. reset output label"""
+        self.set_output_label()
+
     @traitlets.observe("pseudo_filename")
     def _observe_pseudo_filename(self, _):
-        if "psl" in self.pseudo_filename:
-            self.psp_family.value = "psl"
+        from aiidalab_sssp.inspect import parse_label
+
+        try:
+            label_dict = parse_label(self.pseudo_filename.split(".")[:-1])
+        except Exception:
+            pass
         else:
-            self.psp_family.value = "unknown"
+            with self.hold_trait_notifications():
+                self.family.value = label_dict["family"]
+                self.gen_tool.value = label_dict["tool"]
+                self.version.value = label_dict["version"]
+
+            self.set_output_label()
+
+    def set_output_label(self):
+        try:
+            header = helper_parse_upf(self.pseudo[1])
+            type = header.get("pseudo_type", None)
+            element = self.pseudo.element
+            z_valence = self.pseudo.z_valence
+        except Exception:
+            # no pseudo set
+            self.output_label = f"Unset-pseudo|{self.family.value}|{self.gen_tool.value}|{self.version.value}"
+        else:
+            self.output_label = f"{element}|{type}|{z_valence}|{self.family.value}|{self.gen_tool.value}|{self.version.value}"
+            if self.extra.value:
+                self.output_label += f"-{self.extra.value}"
 
 
 class SettingPseudoMetadataStep(ipw.VBox, WizardAppWidgetStep):
     """setting the extra metadata for the future query and description display of the pseudo"""
 
+    previous_step_state = traitlets.UseEnum(WizardAppWidgetStep.State)
     pseudo = traitlets.Instance(UpfData, allow_none=True)
     confirmed = traitlets.Bool()
-    previous_step_state = traitlets.UseEnum(WizardAppWidgetStep.State)
-    metadata_settings = traitlets.Instance(MetadataSettings, allowed_none=True)
+    output_metadata = traitlets.Dict(allow_none=True)
 
     metadata_help = ipw.HTML(
         """<div style="line-height:120%; padding-top:10px;">
@@ -537,19 +575,20 @@ class SettingPseudoMetadataStep(ipw.VBox, WizardAppWidgetStep):
         <ul>
         <li>family indicate the library, sg15, gbrv etc.</li>
         <li>version of library.</li>
+        <li>tool used to generate pseudopotential.</li>
         <li>extra label is optional append to the label.</li>
         <li>description of node.</li>
         </ul>
         </div>"""
     )
 
+    _TITLE_PLACEHODER = "<p>No pseudopotential detect</p>"
+
     def __init__(self, **kwargs):
-        self.metadata_settings = MetadataSettings()
+        self.title = ipw.HTML(self._TITLE_PLACEHODER)
 
         self._psp_element = None
         self._psp_type = None
-
-        self.title = ipw.HTML("<p>No pseudopotential detect</p>")
 
         self._submission_blocker_messages = ipw.HTML()
 
@@ -577,6 +616,10 @@ class SettingPseudoMetadataStep(ipw.VBox, WizardAppWidgetStep):
             **kwargs,
         )
 
+    @traitlets.observe("metadata_settings")
+    def _on_metadata_settings_change(self, _):
+        self._update_title()
+
     def _update_state(self, _=None):
         if self.previous_step_state == self.State.SUCCESS:
             self.confirm_button.disabled = False
@@ -596,12 +639,19 @@ class SettingPseudoMetadataStep(ipw.VBox, WizardAppWidgetStep):
             self._psp_type = header.get("pseudo_type", None)
             self._psp_element = self.pseudo.element
 
-            self.title.value = f"<p>Element: {self._psp_element}, Type: {self._psp_type}, z={self.pseudo.z_valence}</p>"
+            self._update_title()
 
-    def confirm(self, _None):
+    def _update_title(self):
+        try:
+            self.title.value = f"<p>{self._psp_element}|z={self.pseudo.z_valence}|{self._psp_type}|{self.metadata_settings.output_label}</p>"
+        except Exception:
+            self.title = ipw.HTML(self._TITLE_PLACEHODER)
+
+    def confirm(self, _):
         if not (
-            self.metadata_settings.psp_family.value
-            and self.metadata_settings.psp_version.value
+            self.metadata_settings.family.value
+            and self.metadata_settings.version.value
+            and self.metadata_settings.gen_tool.value
             and self._psp_element
             and self._psp_type
         ):
@@ -619,7 +669,7 @@ class SettingPseudoMetadataStep(ipw.VBox, WizardAppWidgetStep):
         return self.State.INIT
 
     def reset(self):
-        self.title.value = ""
+        self.title = ipw.HTML(self._TITLE_PLACEHODER)
 
 
 class ResourceSelectionWidget(ipw.VBox):
