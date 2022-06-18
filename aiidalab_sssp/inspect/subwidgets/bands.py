@@ -228,6 +228,7 @@ class BandChessboard(ipw.VBox):
                 )
 
                 distance = get_bands_distance(
+                    element=element,
                     bandsdata_a=bandsdata1,
                     bandsdata_b=bandsdata2,
                     smearing=_DEGAUSS * _RY_TO_EV,

@@ -6,7 +6,9 @@ Will in here refactoring it so no need to use the aiida datatype as inputs.
 calculate bands distance
 """
 import numpy as np
-from aiida_sssp_workflow.efermi import find_efermi
+
+# from aiida_sssp_workflow.efermi import find_efermi
+from aiida_sssp_workflow.utils import MAGNETIC_ELEMENTS
 
 
 def get_homo(bands, num_electrons: int):
@@ -20,15 +22,20 @@ def get_homo(bands, num_electrons: int):
     return max(band)
 
 
-def fermi_dirac(band_energy, fermi_energy, smearing):
+def fermi_dirac(band_energy, fermi_energy, smearing, spin):
     """
     The first argument can be an array
     """
+    if spin:
+        occ = 1.0
+    else:
+        occ = 2.0
+
     old_settings = np.seterr(over="raise", divide="raise")
     try:
-        res = 1.0 / (np.exp((band_energy - fermi_energy) / smearing) + 1.0)
+        res = occ / (np.exp((band_energy - fermi_energy) / smearing) + 1.0)
     except FloatingPointError:
-        res = np.heaviside(fermi_energy - band_energy, 1.0)
+        res = np.heaviside(fermi_energy - band_energy, occ)
     np.seterr(**old_settings)
 
     return res
@@ -53,36 +60,40 @@ def retrieve_bands(
     I simply concatenate along the first dimension.
     """
     bands = bandsdata.get("bands")
-    weights = bandsdata.get("weights")
+    # weights = bandsdata.get("weights")
 
     # reduce by first dimension of up, down spins
     if len(bands.shape) > 2:
+        bands = bands[:, :, start_band_idx : start_band_idx + num_bands]
         nspin, nk, nbands = bands.shape
         bands = bands.reshape(nk, nbands * nspin)
-        np.sort(bands)  # sort along last axis - eigenvalues of specific kpoint
+    else:
+        # update bands shift to fermi_level
+        bands = bands[:, start_band_idx : start_band_idx + num_bands]
 
-    # update bands shift to fermi_level
-    bands = bands - bandsdata["fermi_level"]  # shift all bands to fermi energy 0
-    bands = bands[:, start_band_idx : start_band_idx + num_bands]
-    bandsdata["bands"] = bands
+    # shift to fermi level aligh to zero
+    bandsdata["bands"] = bands - bandsdata["fermi_level"]
+    bandsdata["fermi_level"] = 0.0
 
     # update fermi_level
-    if do_smearing:
-        # for bands distance convergence
-        # and metals in bands measure verification.
-        nelectrons = num_electrons
-        bands = np.asfortranarray(bands)
-        meth = 2  # firmi-dirac smearing
-
-        bandsdata["fermi_level"] = find_efermi(
-            bands, weights, nelectrons, smearing, meth
-        )
-
-    else:
+    if not do_smearing:
         # easy to spot the efermi energy only used for non-metals of typical configurations
         # in bands measure.
         homo_energy = get_homo(bands, num_electrons)
         bandsdata["fermi_level"] = homo_energy
+
+    else:
+        # for bands distance convergence
+        # and metals in bands measure verification.
+        # bands = np.asfortranarray(bands)
+        # meth = 2  # firmi-dirac smearing
+
+        # bandsdata["fermi_level"] = find_efermi(
+        #     bands, weights, num_electrons, smearing, meth
+        # )
+        #####
+        # use the fermi_level from QE therefore do nothing.
+        pass
 
     return bandsdata
 
@@ -90,6 +101,7 @@ def retrieve_bands(
 def calculate_eta_and_max_diff(
     bandsdata_a: dict,
     bandsdata_b: dict,
+    spin: bool,
     fermi_shift,
     smearing,
 ):
@@ -121,8 +133,8 @@ def calculate_eta_and_max_diff(
     bands_a = bands_a[:, : num_bands - 1]
     bands_b = bands_b[:, : num_bands - 1]
 
-    occ_a = fermi_dirac(bands_a, fermi_level_a + fermi_shift, smearing)
-    occ_b = fermi_dirac(bands_b, fermi_level_b + fermi_shift, smearing)
+    occ_a = fermi_dirac(bands_a, fermi_level_a + fermi_shift, smearing, spin)
+    occ_b = fermi_dirac(bands_b, fermi_level_b + fermi_shift, smearing, spin)
     occ = np.sqrt(occ_a * occ_b)
 
     bands_diff = bands_a - bands_b
@@ -156,6 +168,7 @@ def calculate_eta_and_max_diff(
 
 
 def get_bands_distance(
+    element: str,
     bandsdata_a: dict,
     bandsdata_b: dict,
     smearing: float,
@@ -220,6 +233,11 @@ def get_bands_distance(
         bandsdata_b["bands"]
     ), f'{np.shape(bandsdata_a["bands"])} != {np.shape(bandsdata_b["bands"])}'
 
+    if element in MAGNETIC_ELEMENTS:
+        spin = True
+    else:
+        spin = False
+
     # eta_v
     fermi_shift_v = 0.0
     if do_smearing:
@@ -228,7 +246,7 @@ def get_bands_distance(
         smearing_v = 0
 
     outputs = calculate_eta_and_max_diff(
-        bandsdata_a, bandsdata_b, fermi_shift_v, smearing_v
+        bandsdata_a, bandsdata_b, spin, fermi_shift_v, smearing_v
     )
 
     _eV_to_mev = 1000
@@ -240,7 +258,7 @@ def get_bands_distance(
     # if not metal
     smearing_c = smearing
     outputs = calculate_eta_and_max_diff(
-        bandsdata_a, bandsdata_b, fermi_shift, smearing_c
+        bandsdata_a, bandsdata_b, spin, fermi_shift, smearing_c
     )
 
     eta_c = outputs.get("eta") * _eV_to_mev
