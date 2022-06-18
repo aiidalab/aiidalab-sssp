@@ -62,6 +62,10 @@ class SelectMultipleCheckbox(ipw.VBox):
             lib_folder = "PAW-JTH1.1-stringent"
         elif "gbrv" in label:
             lib_folder = "US-GBRV-1.x"
+        elif "wentzcovitch" in label and "neo" in label:
+            lib_folder = "PAW-RE-Wentzcovitch/neo"
+        elif "wentzcovitch" in label and "legacy" in label:
+            lib_folder = "PAW-RE-Wentzcovitch/legacy"
         else:
             lib_folder = "UNCATOGRIZED"
 

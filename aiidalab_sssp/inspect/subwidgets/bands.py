@@ -25,8 +25,12 @@ def _bandview(json_path):
 
     :param json_path: the path to json file
     """
-    with open(json_path, "r") as fh:
-        data = json.load(fh)
+    try:
+        with open(json_path, "r") as fh:
+            data = json.load(fh)
+    except Exception:
+        # the bands file not exist
+        data = None
 
     return data
 
@@ -61,8 +65,10 @@ class BandStructureWidget(ipw.VBox):
     def _on_pseeudos_change(self, change):
         if change["new"]:
             self.layout.visibility = "visible"
-            self.pseudo1_select.options = list(self.pseudos.keys())
-            self.pseudo2_select.options = list(self.pseudos.keys())
+            self.pseudo1_select.options = ["None"] + list(self.pseudos.keys())
+            self.pseudo2_select.options = ["None"] + list(self.pseudos.keys())
+            # The first bands default select the first pseudo
+            self.pseudo1_select.value = list(self.pseudos.keys())[0]
         else:
             self.layout.visibility = "hidden"
 
@@ -78,18 +84,20 @@ class BandStructureWidget(ipw.VBox):
             json_path = Path.joinpath(SSSP_DB, path)
 
             band = _bandview(json_path)
-            bands.append(band)
+            if band:
+                bands.append(band)
 
         if pseudo2:
             path = pseudo2["accuracy"]["bands"]["band_structure"]
             json_path = Path.joinpath(SSSP_DB, path)
 
             band = _bandview(json_path)
-            bands.append(band)
+            if band:
+                bands.append(band)
 
         _band_structure_preview = BandsPlotWidget(
             bands=bands,
-            energy_range={"ymin": -10.0, "ymax": 11.0},
+            energy_range={"ymin": -30.0, "ymax": 11.0},
         )
 
         with self.band_structure:
@@ -220,6 +228,7 @@ class BandChessboard(ipw.VBox):
                 )
 
                 distance = get_bands_distance(
+                    element=element,
                     bandsdata_a=bandsdata1,
                     bandsdata_b=bandsdata2,
                     smearing=_DEGAUSS * _RY_TO_EV,
