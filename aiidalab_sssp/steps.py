@@ -9,7 +9,6 @@ from aiida.common import NotExistent
 from aiida.engine import ProcessState
 from aiida.orm import Node, ProcessNode, load_code
 from aiida.plugins import DataFactory, WorkflowFactory
-from aiida_sssp_workflow.utils import helper_parse_upf
 from aiida_sssp_workflow.workflows.verifications import DEFAULT_PROPERTIES_LIST
 from aiidalab_widgets_base import (
     ComputationalResourcesWidget,
@@ -55,7 +54,8 @@ Supported pseudo formats (Now only support UPF type)
 
             # Order matters make sure when pseudo change
             # the pseudo_filename is set
-            self.pseudo = (fname, UpfData(io.BytesIO(content)))
+            with self.hold_trait_notifications():
+                self.pseudo = (fname, UpfData(io.BytesIO(content)))
         except ValueError:
             self.error_message = (
                 "wrong pseudopotential file type. (Only UPF support now)"
@@ -67,8 +67,7 @@ class PseudoSelectionStep(ipw.VBox, WizardAppWidgetStep):
     Upload a pesudopotential and store it as UpfData in database
     """
 
-    pseudo = traitlets.Tuple()
-    confirmed_pseudo = traitlets.Tuple()
+    confirmed_pseudo = traitlets.Tuple(allow_none=True)
 
     def __init__(self, **kwargs):
         self.pseudo_upload = PseudoUploadWidget()
@@ -117,24 +116,23 @@ class PseudoSelectionStep(ipw.VBox, WizardAppWidgetStep):
         return self.State.INIT
 
     def _update_state(self):
-        if self.pseudo is None:
+        if self.pseudo_text is None:
             self.state = self.State.READY
         else:
-            if self.confirmed_pseudo is None:
-                self.state = self.State.CONFIGURED
-                self.confirm_button.disabled = False
-            else:
+            if self.confirmed_pseudo:
                 self.state = self.State.SUCCESS
                 self.confirm_button.disabled = True
+            else:
+                self.state = self.State.CONFIGURED
+                self.confirm_button.disabled = False
 
     def _observe_pseudo_upload(self, _):
         with self.hold_trait_notifications():
-            if self.pseudo_upload.file_pseudo is None:
+            if self.pseudo_upload.pseudo is None:
                 self.message_area.value = self.pseudo_upload.error_message
             else:
                 # Upload then set pseudo and show filename on text board
-                self.pseudo_filename, self.pseudo = self.pseudo_upload.file_pseudo
-                self.pseudo_text.value = self.pseudo_filename
+                self.pseudo_text.value = self.pseudo_upload.pseudo[0]
 
                 if self.pseudo_upload.error_message:
                     self.message_area.value = self.pseudo_upload.error_message
@@ -142,7 +140,7 @@ class PseudoSelectionStep(ipw.VBox, WizardAppWidgetStep):
             self._update_state()
 
     @traitlets.observe("confirmed_pseudo")
-    def _observe_confirmed_structure(self, _):
+    def _observe_confirmed_pseudo(self, _):
         with self.hold_trait_notifications():
             self._update_state()
 
@@ -150,7 +148,7 @@ class PseudoSelectionStep(ipw.VBox, WizardAppWidgetStep):
         return self.confirmed_pseudo is not None
 
     def confirm(self, _=None):
-        self.confirmed_pseudo = self.pseudo
+        self.confirmed_pseudo = self.pseudo_upload.pseudo
 
         self._update_state()
 
@@ -472,8 +470,8 @@ class MetadataSettings(ipw.VBox):
     to identify the pseudopotentials.
     """
 
-    pseudo = traitlets.Tuple()
-    output_label = traitlets.Unicode()
+    pseudo = traitlets.Tuple(allow_none=True)
+    output_metadata = traitlets.Dict()
 
     def __init__(self, **kwargs):
         extra = {
@@ -496,16 +494,10 @@ class MetadataSettings(ipw.VBox):
             description="Pseudopotential version:",
             **extra,
         )
-        self.extra = ipw.Text(
-            placeholder="Optional",
-            description="Pseudopotential extra label:",
-            **extra,
-        )
 
         self.family.observe(self._on_tag_change)
         self.gen_tool.observe(self._on_tag_change)
         self.version.observe(self._on_tag_change)
-        self.extra.observe(self._on_tag_change)
 
         self.description = ipw.Textarea(
             placeholder="Optional",
@@ -518,7 +510,6 @@ class MetadataSettings(ipw.VBox):
                 self.family,
                 self.gen_tool,
                 self.version,
-                self.extra,
                 self.description,
             ],
             **kwargs,
@@ -526,46 +517,56 @@ class MetadataSettings(ipw.VBox):
 
     def _on_tag_change(self, _):
         """family/gen_tool/version/extra change. reset output label"""
-        self.set_output_label()
+        self.output_metadata["family"] = self.family.value
+        self.output_metadata["tool"] = self.gen_tool.value
+        self.output_metadata["version"] = self.version.value
 
-    @traitlets.observe("pseudo_filename")
-    def _observe_pseudo_filename(self, _):
+    @traitlets.observe("pseudo")
+    def _observe_pseudo(self, _):
+        from pseudo_parser.upf_parser import parse
+
         from aiidalab_sssp.inspect import parse_label
 
         try:
-            label_dict = parse_label(self.pseudo_filename.split(".")[:-1])
+            # when upload a standard named input
+            label = ".".join(self.pseudo[0].split(".")[:-1])
+            label_dict = parse_label(label)
+        except IndexError:
+            # tuple index out of range. Pseudo not upload yet.
+            self.output_metadata = {}
         except Exception:
-            pass
-        else:
-            with self.hold_trait_notifications():
-                self.family.value = label_dict["family"]
-                self.gen_tool.value = label_dict["tool"]
-                self.version.value = label_dict["version"]
+            # when upload a non-standard named input upf
+            pseudo_info = parse(self.pseudo[1].get_content())
 
-            self.set_output_label()
-
-    def set_output_label(self):
-        try:
-            header = helper_parse_upf(self.pseudo[1])
-            type = header.get("pseudo_type", None)
-            element = self.pseudo.element
-            z_valence = self.pseudo.z_valence
-        except Exception:
-            # no pseudo set
-            self.output_label = f"Unset-pseudo|{self.family.value}|{self.gen_tool.value}|{self.version.value}"
+            self.output_metadata = {
+                "element": pseudo_info["element"],
+                "type": pseudo_info["pp_type"],
+                "z_valence": pseudo_info["z_valence"],
+                "family": self.family.value,
+                "tool": self.gen_tool.value,
+                "version": self.version.value,
+            }
         else:
-            self.output_label = f"{element}|{type}|{z_valence}|{self.family.value}|{self.gen_tool.value}|{self.version.value}"
-            if self.extra.value:
-                self.output_label += f"-{self.extra.value}"
+            self.output_metadata = {
+                "element": label_dict["element"],
+                "type": label_dict["type"],
+                "z_valence": label_dict["z"],
+                "family": label_dict["family"],
+                "tool": label_dict["tool"],
+                "version": label_dict["version"],
+            }
+            self.family.value = label_dict["family"]
+            self.gen_tool.value = label_dict["tool"]
+            self.version.value = label_dict["version"]
 
 
 class SettingPseudoMetadataStep(ipw.VBox, WizardAppWidgetStep):
     """setting the extra metadata for the future query and description display of the pseudo"""
 
     previous_step_state = traitlets.UseEnum(WizardAppWidgetStep.State)
-    pseudo = traitlets.Instance(UpfData, allow_none=True)
+    pseudo = traitlets.Tuple(allow_none=True)
     confirmed = traitlets.Bool()
-    output_metadata = traitlets.Dict(allow_none=True)
+    output_label = traitlets.Unicode()
 
     metadata_help = ipw.HTML(
         """<div style="line-height:120%; padding-top:10px;">
@@ -587,8 +588,8 @@ class SettingPseudoMetadataStep(ipw.VBox, WizardAppWidgetStep):
     def __init__(self, **kwargs):
         self.title = ipw.HTML(self._TITLE_PLACEHODER)
 
-        self._psp_element = None
-        self._psp_type = None
+        self.metadata_settings = MetadataSettings()
+        self.metadata_settings.observe(self._on_metadata_settings_change)
 
         self._submission_blocker_messages = ipw.HTML()
 
@@ -616,9 +617,36 @@ class SettingPseudoMetadataStep(ipw.VBox, WizardAppWidgetStep):
             **kwargs,
         )
 
-    @traitlets.observe("metadata_settings")
-    def _on_metadata_settings_change(self, _):
+    @traitlets.observe("pseudo")
+    def _on_pseudo_change(self, _):
+        self.metadata_settings.pseudo = self.pseudo
         self._update_title()
+
+    def _on_metadata_settings_change(self, _):
+        # FIXME: not triggered.???
+        self._update_title()
+
+    def _update_title(self):
+        label = self._get_label_from_metadata()
+        self.title.value = f"<p>The standard label of psedopotential is: {label}</p>"
+
+    def _get_label_from_metadata(self):
+        metadata = self.metadata_settings.output_metadata
+
+        try:
+            element = metadata["element"]
+            psp_type = metadata["type"]
+            z_valence = metadata["z_valence"]
+            family = metadata["family"]
+            tool = metadata["tool"]
+            version = metadata["version"]
+
+            output_label = f"{element}.{psp_type}.{z_valence}.{tool}.{family}.{version}"
+        except KeyError:
+            # the metadata not set
+            output_label = "Not set."
+
+        return output_label
 
     def _update_state(self, _=None):
         if self.previous_step_state == self.State.SUCCESS:
@@ -632,44 +660,22 @@ class SettingPseudoMetadataStep(ipw.VBox, WizardAppWidgetStep):
     def _observe_previous_step_state(self, _):
         self._update_state()
 
-    @traitlets.observe("pseudo")
-    def _observe_pseudo(self, _):
-        if self.pseudo:
-            header = helper_parse_upf(self.pseudo)
-            self._psp_type = header.get("pseudo_type", None)
-            self._psp_element = self.pseudo.element
-
-            self._update_title()
-
-    def _update_title(self):
-        try:
-            self.title.value = f"<p>{self._psp_element}|z={self.pseudo.z_valence}|{self._psp_type}|{self.metadata_settings.output_label}</p>"
-        except Exception:
-            self.title = ipw.HTML(self._TITLE_PLACEHODER)
-
     def confirm(self, _):
-        if not (
-            self.metadata_settings.family.value
-            and self.metadata_settings.version.value
-            and self.metadata_settings.gen_tool.value
-            and self._psp_element
-            and self._psp_type
-        ):
-            self.state = self.State.READY
-            self._submission_blocker_messages.value = """
-                <div class="alert alert-info">
-                Not fully set.</div>"""
+        for key in ["element", "type", "family", "z_valence", "tool", "version"]:
+            if key not in self.metadata_settings.output_metadata:
+                self.state = self.State.READY
+                self._submission_blocker_messages.value = f"""
+                    <div class="alert alert-info">
+                    {key} is not set for labelling.</div>"""
         else:
             self._submission_blocker_messages.value = ""
+            self.output_label = self._get_label_from_metadata()
             self.confirm_button.disabled = True
             self.state = self.State.SUCCESS
 
     @traitlets.default("state")
     def _default_state(self):
         return self.State.INIT
-
-    def reset(self):
-        self.title = ipw.HTML(self._TITLE_PLACEHODER)
 
 
 class ResourceSelectionWidget(ipw.VBox):
@@ -754,10 +760,10 @@ class ParallelizationSettings(ipw.VBox):
 class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
     """step of submit verification"""
 
+    pseudo = traitlets.Tuple(allow_none=True)
     process = traitlets.Instance(ProcessNode, allow_none=True)
-    pseudo = traitlets.Instance(UpfData, allow_none=True)
     previous_step_state = traitlets.UseEnum(WizardAppWidgetStep.State)
-    metadata_settings = traitlets.Instance(MetadataSettings, allow_none=True)
+    pseudo_label = traitlets.Unicode()
     workchain_settings = traitlets.Instance(WorkChainSettings, allow_none=True)
 
     _submission_blockers = traitlets.List(traitlets.Unicode)
@@ -893,15 +899,26 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
 
     def submit(self):
         """Run the workflow to calculate delta factor"""
+        from aiida.engine import submit
+
         builder = VerificationWorkChain.get_builder()
 
-        builder.pseudo = self.pseudo
+        builder.pseudo = self.pseudo[1]
         builder.pw_code = self.pw_code.value
         builder.ph_code = self.ph_code.value
+        builder.label = orm.Str(self.pseudo_label)
 
-        builder.protocol = orm.Str(self._PROTOCOL)
-        builder.criteria = orm.Str(self.workchain_settings.criteria.value)
-        builder.cutoff_control = orm.Str(self.workchain_settings.calc_type.value)
+        builder.accuracy = {
+            "protocol": orm.Str(self._PROTOCOL),
+            "cutoff_control": orm.Str(self.workchain_settings.calc_type.value),
+        }
+
+        builder.convergence = {
+            "protocol": orm.Str(self._PROTOCOL),
+            "cutoff_control": orm.Str(self.workchain_settings.calc_type.value),
+            "criteria": orm.Str(self.workchain_settings.criteria.value),
+        }
+
         builder.properties_list = orm.List(list=self.workchain_settings.properties_list)
 
         builder.options = orm.Dict(
@@ -915,34 +932,20 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
         builder.parallelization = orm.Dict(
             dict={"npool": self.parallelization.npools.value}
         )
-        builder.clean_workdir_level = orm.Int(9)  # anyway clean all
+        builder.clean_workchain = orm.Bool(True)  # anyway clean all
 
-        # set extras for easy query and comprehensive show results
-        header = helper_parse_upf(self.pseudo)
+        # print("properties_list:", builder.properties_list.get_list())
+        # print("protocol:", builder.accuracy.protocol.value)
+        # print("criteria:", builder.convergence.criteria.value)
+        # print("cutoff_control:", builder.accuracy.cutoff_control.value)
+        # print("options:", builder.options.get_dict())
+        # print("parallelization:", builder.parallelization.get_dict())
+        # print("clean_workdir_level:", builder.clean_workchain.value)
+        # print("label:", builder.label.value)
 
-        element = self.pseudo.element
-        psp_type = header.get("pseudo_type", None)
-        psp_family = self.metadata_settings.psp_family.value
-        psp_version = self.metadata_settings.psp_version.value
-        psp_extra_label = self.metadata_settings.psp_extra_label.value
-        label = f"{element.lower()}/{psp_type.lower()}/z={self.pseudo.z_valence}/{psp_family.lower()}/{psp_version}"
-        if psp_extra_label:
-            label += f"/{psp_extra_label}"
+        self.process = submit(builder)
 
-        builder.label = orm.Str(label)
-
-        print("properties_list:", builder.properties_list.get_list())
-        print("protocol:", builder.protocol.value)
-        print("criteria:", builder.criteria.value)
-        print("cutoff_control:", builder.cutoff_control.value)
-        print("options:", builder.options.get_dict())
-        print("parallelization:", builder.parallelization.get_dict())
-        print("clean_workdir_level:", builder.clean_workdir_level.value)
-        print("label:", builder.label.value)
-
-        # self.process = submit(builder)
-
-        # self.process.description = self.metadata_settings.description.value
+        self.process.description = self.pseudo_label
 
     def _on_submit_button_clicked(self, _):
         self.submit_button.disabled = True
@@ -960,19 +963,19 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
             self.state = self.State.SUCCESS
 
         # Input structure not specified.
-        if self.pseudo is None:
+        if not self.pseudo:
             self._submission_blockers = ["No pseudo selected."]
             # This blocker is handled differently than the other blockers,
             # because it is displayed as INIT state.
             self.state = self.State.INIT
-
-        blockers = list(self._identify_submission_blockers())
-        if any(blockers):
-            self._submission_blockers = blockers
-            self.state = self.State.READY
         else:
-            self._submission_blockers = []
-            self.state = self.state.CONFIGURED
+            blockers = list(self._identify_submission_blockers())
+            if any(blockers):
+                self._submission_blockers = blockers
+                self.state = self.State.READY
+            else:
+                self._submission_blockers = []
+                self.state = self.state.CONFIGURED
 
     def _identify_submission_blockers(self):
         # No input pseudo specified.
