@@ -25,8 +25,12 @@ def _bandview(json_path):
 
     :param json_path: the path to json file
     """
-    with open(json_path, "r") as fh:
-        data = json.load(fh)
+    try:
+        with open(json_path, "r") as fh:
+            data = json.load(fh)
+    except Exception:
+        # the bands file not exist
+        data = None
 
     return data
 
@@ -80,14 +84,16 @@ class BandStructureWidget(ipw.VBox):
             json_path = Path.joinpath(SSSP_DB, path)
 
             band = _bandview(json_path)
-            bands.append(band)
+            if band:
+                bands.append(band)
 
         if pseudo2:
             path = pseudo2["accuracy"]["bands"]["band_structure"]
             json_path = Path.joinpath(SSSP_DB, path)
 
             band = _bandview(json_path)
-            bands.append(band)
+            if band:
+                bands.append(band)
 
         _band_structure_preview = BandsPlotWidget(
             bands=bands,
