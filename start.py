@@ -13,6 +13,7 @@ template = """
   <td valign="top"><ul>
     <li><a href="{appbase}/verification.ipynb" target="_blank">Running SSSP Verification (post0)</a></li>
     <li><a href="{appbase}/inspect.ipynb" target="_blank"> Inspect and Compare Verification Results (post0)</a></li>
+    <li>Generate pseudopotential using: <a href="{appbase}/ld1.ipynb" target="_blank">ld1</a>, <a href="{appbase}/oncvpsp.ipynb" target="_blank">oncvpsp</a> or <a href="{appbase}/atompaw.ipynb" target="_blank">atompaw</a></li>
   </ul></td>
 </tr>
 </table>
