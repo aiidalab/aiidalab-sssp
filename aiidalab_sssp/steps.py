@@ -7,7 +7,7 @@ import traitlets
 from aiida import orm
 from aiida.common import NotExistent
 from aiida.engine import ProcessState
-from aiida.orm import Node, ProcessNode, load_code, load_node
+from aiida.orm import Node, load_code, load_node
 from aiida.plugins import DataFactory, WorkflowFactory
 from aiida_sssp_workflow.workflows.verifications import DEFAULT_PROPERTIES_LIST
 from aiidalab_widgets_base import (
@@ -945,7 +945,7 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
 
         process = submit(builder)
         process.description = self.pseudo_label
-        
+
         self.value = process.uuid
 
     def _on_submit_button_clicked(self, _):
@@ -1183,7 +1183,7 @@ class ShowVerificationStatus(ipw.VBox):
     def _update_state(self):
         if self.value is not None:
             process = load_node(self.value)
-            infos = self._get_verification_info(self.value)
+            infos = self._get_verification_info(process)
             not_running_text = parse_state_to_info(None)
 
             self.delta_measure_state.value = infos.get(
