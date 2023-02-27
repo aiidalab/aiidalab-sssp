@@ -7,7 +7,7 @@ import traitlets
 from aiida import orm
 from aiida.common import NotExistent
 from aiida.engine import ProcessState
-from aiida.orm import Node, ProcessNode, load_code
+from aiida.orm import Node, ProcessNode, load_code, load_node
 from aiida.plugins import DataFactory, WorkflowFactory
 from aiida_sssp_workflow.workflows.verifications import DEFAULT_PROPERTIES_LIST
 from aiidalab_widgets_base import (
@@ -761,7 +761,7 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
     """step of submit verification"""
 
     pseudo = traitlets.Tuple(allow_none=True)
-    process = traitlets.Instance(ProcessNode, allow_none=True)
+    value = traitlets.Unicode(allow_none=True)
     previous_step_state = traitlets.UseEnum(WizardAppWidgetStep.State)
     pseudo_label = traitlets.Unicode()
     workchain_settings = traitlets.Instance(WorkChainSettings, allow_none=True)
@@ -943,9 +943,10 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
         # print("clean_workdir_level:", builder.clean_workchain.value)
         # print("label:", builder.label.value)
 
-        self.process = submit(builder)
-
-        self.process.description = self.pseudo_label
+        process = submit(builder)
+        process.description = self.pseudo_label
+        
+        self.value = process.uuid
 
     def _on_submit_button_clicked(self, _):
         self.submit_button.disabled = True
@@ -959,7 +960,7 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
 
     def _update_state(self, _=None):
         # Process is already running.
-        if self.process is not None:
+        if self.value is not None:
             self.state = self.State.SUCCESS
 
         # Input structure not specified.
@@ -1015,13 +1016,13 @@ class NodeViewWidget(ipw.VBox):
 
 class ViewSsspAppWorkChainStatusAndResultsStep(ipw.VBox, WizardAppWidgetStep):
 
-    process = traitlets.Instance(ProcessNode, allow_none=True)
+    value = traitlets.Unicode(allow_none=True)
 
     def __init__(self, **kwargs):
         self.process_tree = ProcessNodesTreeWidget()
         self.verification_status = ShowVerificationStatus()
-        ipw.dlink((self, "process"), (self.process_tree, "process"))
-        ipw.dlink((self, "process"), (self.verification_status, "process"))
+        ipw.dlink((self, "value"), (self.process_tree, "value"))
+        ipw.dlink((self, "value"), (self.verification_status, "value"))
 
         self.node_view = NodeViewWidget(layout={"width": "auto", "height": "auto"})
         ipw.dlink(
@@ -1039,7 +1040,7 @@ class ViewSsspAppWorkChainStatusAndResultsStep(ipw.VBox, WizardAppWidgetStep):
                 self._update_state,
             ],
         )
-        ipw.dlink((self, "process"), (self.process_monitor, "process"))
+        ipw.dlink((self, "value"), (self.process_monitor, "value"))
 
         super().__init__(
             [
@@ -1054,13 +1055,14 @@ class ViewSsspAppWorkChainStatusAndResultsStep(ipw.VBox, WizardAppWidgetStep):
         return self.state is not self.State.ACTIVE
 
     def reset(self):
-        self.process = None
+        self.value = None
 
     def _update_state(self):
-        if self.process is None:
+        if self.value is None:
             self.state = self.State.INIT
         else:
-            process_state = self.process.process_state
+            process = load_node(self.value)
+            process_state = process.process_state
             if process_state in (
                 ProcessState.CREATED,
                 ProcessState.RUNNING,
@@ -1072,8 +1074,8 @@ class ViewSsspAppWorkChainStatusAndResultsStep(ipw.VBox, WizardAppWidgetStep):
             elif process_state is ProcessState.FINISHED:
                 self.state = self.State.SUCCESS
 
-    @traitlets.observe("process")
-    def _observe_process(self, change):
+    @traitlets.observe("value")
+    def _observe_process(self, _):
         self._update_state()
 
 
@@ -1092,7 +1094,7 @@ def parse_state_to_info(process_state, exit_status=None) -> str:
 
 class ShowVerificationStatus(ipw.VBox):
 
-    process = traitlets.Instance(ProcessNode, allow_none=True)
+    value = traitlets.Unicode(allow_none=True)
 
     def __init__(self, **kwargs):
         init_info = parse_state_to_info(None)
@@ -1179,8 +1181,9 @@ class ShowVerificationStatus(ipw.VBox):
         return res
 
     def _update_state(self):
-        if self.process is not None:
-            infos = self._get_verification_info(self.process)
+        if self.value is not None:
+            process = load_node(self.value)
+            infos = self._get_verification_info(self.value)
             not_running_text = parse_state_to_info(None)
 
             self.delta_measure_state.value = infos.get(
@@ -1202,6 +1205,6 @@ class ShowVerificationStatus(ipw.VBox):
     def _on_refresh_button_clicked(self, _):
         self._update_state()
 
-    @traitlets.observe("process")
-    def _observe_process(self, change):
+    @traitlets.observe("value")
+    def _observe_process(self, _):
         self._update_state()
