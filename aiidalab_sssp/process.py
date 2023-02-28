@@ -11,7 +11,7 @@ from aiida.orm import load_node
 class WorkChainSelector(ipw.HBox):
 
     # The PK of a 'aiida.workflows:quantumespresso.pw.bands' WorkChainNode.
-    value = traitlets.Int(allow_none=True)
+    value = traitlets.Unicode(allow_none=True)
 
     # When this trait is set to a positive value, the work chains are automatically
     # refreshed every `auto_refresh_interval` seconds.
@@ -36,7 +36,7 @@ class WorkChainSelector(ipw.HBox):
         ipw.dlink(
             (self.work_chains_selector, "value"),
             (self, "value"),
-            transform=lambda pk: None if pk is self._NO_PROCESS else pk,
+            transform=lambda pk: None if pk is self._NO_PROCESS else str(pk),
         )
 
         self.refresh_work_chains_button = ipw.Button(description="Refresh")
