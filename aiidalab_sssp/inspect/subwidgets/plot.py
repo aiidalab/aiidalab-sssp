@@ -6,7 +6,6 @@ from aiidalab_sssp.inspect.plot_utils import convergence
 
 
 class _PlotConvergenBaseWidget(ipw.VBox):
-
     selected_pseudos = traitlets.Dict(allow_none=True)
 
     _WF = "Not implement"
@@ -26,7 +25,6 @@ class _PlotConvergenBaseWidget(ipw.VBox):
 
     @traitlets.observe("selected_pseudos")
     def _on_pseudos_change(self, change):
-
         if change["new"]:
             with self.output:
                 clear_output(wait=True)
@@ -42,7 +40,6 @@ class _PlotConvergenBaseWidget(ipw.VBox):
 
 
 class PlotCohesiveEnergyConvergeWidget(_PlotConvergenBaseWidget):
-
     _WF = "convergence_cohesive_energy"
     _MEASURE = "cohesive_energy_per_atom"
     _YLABEL = "Cohesive Energy per atom (meV/atom)"
@@ -50,7 +47,6 @@ class PlotCohesiveEnergyConvergeWidget(_PlotConvergenBaseWidget):
 
 
 class PlotCohesiveEnergyConvergeDiffWidget(_PlotConvergenBaseWidget):
-
     _WF = "convergence_cohesive_energy"
     _MEASURE = "absolute_diff"
     _YLABEL = "Cohesive Energy per atom (absolute error, meV/atom)"
@@ -58,7 +54,6 @@ class PlotCohesiveEnergyConvergeDiffWidget(_PlotConvergenBaseWidget):
 
 
 class PlotPhononFrequenciesConvergeAbsWidget(_PlotConvergenBaseWidget):
-
     _WF = "convergence_phonon_frequencies"
     _MEASURE = "absolute_diff"
     _YLABEL = "Phonon frequencies ω (absolute error, cm-1)"
@@ -66,7 +61,6 @@ class PlotPhononFrequenciesConvergeAbsWidget(_PlotConvergenBaseWidget):
 
 
 class PlotPhononFrequenciesConvergeRelWidget(_PlotConvergenBaseWidget):
-
     _WF = "convergence_phonon_frequencies"
     _MEASURE = "relative_diff"
     _YLABEL = "Phonon frequencies ω (relative error, %)"
@@ -74,7 +68,6 @@ class PlotPhononFrequenciesConvergeRelWidget(_PlotConvergenBaseWidget):
 
 
 class PlotPressureConvergeWidget(_PlotConvergenBaseWidget):
-
     _WF = "convergence_pressure"
     _MEASURE = "pressure"
     _YLABEL = "Pressure (GPa)"
@@ -82,7 +75,6 @@ class PlotPressureConvergeWidget(_PlotConvergenBaseWidget):
 
 
 class PlotPressureConvergeRelWidget(_PlotConvergenBaseWidget):
-
     _WF = "convergence_pressure"
     _MEASURE = "relative_diff"
     _YLABEL = "Pressure (relative error, %)"
@@ -90,7 +82,6 @@ class PlotPressureConvergeRelWidget(_PlotConvergenBaseWidget):
 
 
 class PlotDeltaConvergeWidget(_PlotConvergenBaseWidget):
-
     _WF = "convergence_delta"
     _MEASURE = "delta"
     _YLABEL = "Δ -factor (meV)"
@@ -98,7 +89,6 @@ class PlotDeltaConvergeWidget(_PlotConvergenBaseWidget):
 
 
 class PlotDeltaConvergeRelWidget(_PlotConvergenBaseWidget):
-
     _WF = "convergence_delta"
     _MEASURE = "relative_diff"
     _YLABEL = "Delta (relative error, %)"
@@ -106,7 +96,6 @@ class PlotDeltaConvergeRelWidget(_PlotConvergenBaseWidget):
 
 
 class PlotBandsConvergeWidget(_PlotConvergenBaseWidget):
-
     _WF = "convergence_bands"
     _MEASURE = "eta_c"
     _YLABEL = "η up above fermi energe 5 eV (meV)"

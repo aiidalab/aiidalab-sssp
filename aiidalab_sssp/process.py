@@ -9,7 +9,6 @@ from aiida.orm import load_node
 
 
 class WorkChainSelector(ipw.HBox):
-
     # The PK of a 'aiida.workflows:quantumespresso.pw.bands' WorkChainNode.
     value = traitlets.Unicode(allow_none=True)
 

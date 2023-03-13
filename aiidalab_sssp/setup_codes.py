@@ -98,7 +98,6 @@ def setup_codes():
 
 
 class QESetupWidget(ipw.VBox):
-
     installed = traitlets.Bool(allow_none=True).tag(readonly=True)
     busy = traitlets.Bool().tag(readonly=True)
     error = traitlets.Unicode().tag(readonly=True)
@@ -324,7 +323,6 @@ class ProgressBar(ipw.HBox):
         super().__init__([self._label, self._progress_bar], *args, **kwargs)
 
     def _animate(self, refresh_rate=0.01):
-
         v0 = self._progress_bar.value
         t0 = time()
 

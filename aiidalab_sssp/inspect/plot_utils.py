@@ -17,7 +17,6 @@ CONFIGURATIONS = [
 
 
 def convergence(pseudos: dict, wf_name, measure_name, ylabel, threshold=None):
-
     px = 1 / plt.rcParams["figure.dpi"]
     fig, (ax1, ax2) = plt.subplots(
         1, 2, gridspec_kw={"width_ratios": [2, 1]}, figsize=(960 * px, 360 * px)

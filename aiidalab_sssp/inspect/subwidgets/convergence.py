@@ -81,11 +81,9 @@ property_map = {
 
 
 class ConvergenceWidget(ipw.VBox):
-
     pseudos = traitlets.Dict(allow_none=True)
 
     def __init__(self):
-
         # using raido button widget so user only choose one proper to check
         # at one time. It can be more, but pollute the UX and not useful.
         self.property_select = ipw.RadioButtons(

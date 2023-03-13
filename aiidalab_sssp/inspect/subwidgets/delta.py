@@ -25,7 +25,6 @@ def birch_murnaghan(V, E0, V0, B0, B01):
 
 
 class NuMeasure(ipw.VBox):
-
     pseudos = traitlets.Dict(allow_none=True)
 
     def __init__(self):
@@ -47,7 +46,6 @@ class NuMeasure(ipw.VBox):
 
     @traitlets.observe("pseudos")
     def _on_pseudos_change(self, change):
-
         if change["new"]:
             self.layout.visibility = "visible"
             with self.out_nu:
@@ -66,7 +64,6 @@ class NuMeasure(ipw.VBox):
 
     @staticmethod
     def _render_plot(pseudos: dict, measure_type):
-
         px = 1 / plt.rcParams["figure.dpi"]  # pixel in inches
         fig, ax = plt.subplots(1, 1, figsize=(1024 * px, 360 * px))
         # conf_list store configuration list of every pseudo
@@ -124,7 +121,6 @@ class NuMeasure(ipw.VBox):
 
 
 class EosWidget(ipw.VBox):
-
     pseudos = traitlets.Dict(allow_none=True)
 
     def __init__(self):

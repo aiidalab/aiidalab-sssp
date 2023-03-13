@@ -159,7 +159,6 @@ class PseudoSelectionStep(ipw.VBox, WizardAppWidgetStep):
 
 
 class WorkChainSettings(ipw.VBox):
-
     calc_type_help = ipw.HTML(
         """<div style="line-height: 140%; padding-top: 6px; padding-bottom: 0px">
         The acwf protocol is used to set the parameters used for pseudopotential
@@ -182,7 +181,6 @@ class WorkChainSettings(ipw.VBox):
     properties_list = traitlets.List()
 
     def __init__(self, **kwargs):
-
         # Accuracy properties
         self.delta_measure = ipw.Checkbox(
             description="",
@@ -342,7 +340,6 @@ class WorkChainSettings(ipw.VBox):
 
 
 class ConfigureSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
-
     confirmed = traitlets.Bool()
     previous_step_state = traitlets.UseEnum(WizardAppWidgetStep.State)
     workchain_settings = traitlets.Instance(WorkChainSettings, allow_none=True)
@@ -849,7 +846,6 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
             self.set_resource_defaults(change["new"].computer)
 
     def set_resource_defaults(self, computer=None):
-
         if computer is None or computer.hostname == "localhost":
             self.resources_config.num_nodes.disabled = True
             self.resources_config.num_nodes.value = 1
@@ -998,7 +994,6 @@ class SubmitSsspWorkChainStep(ipw.VBox, WizardAppWidgetStep):
 
 
 class NodeViewWidget(ipw.VBox):
-
     node = traitlets.Instance(Node, allow_none=True)
 
     def __init__(self, **kwargs):
@@ -1015,7 +1010,6 @@ class NodeViewWidget(ipw.VBox):
 
 
 class ViewSsspAppWorkChainStatusAndResultsStep(ipw.VBox, WizardAppWidgetStep):
-
     value = traitlets.Unicode(allow_none=True)
 
     def __init__(self, **kwargs):
@@ -1093,7 +1087,6 @@ def parse_state_to_info(process_state, exit_status=None) -> str:
 
 
 class ShowVerificationStatus(ipw.VBox):
-
     value = traitlets.Unicode(allow_none=True)
 
     def __init__(self, **kwargs):
