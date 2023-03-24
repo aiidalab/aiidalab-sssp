@@ -1,6 +1,6 @@
 """Moudle contains widgets for accuracy delat results inspect.
 The widget EosWidget for showing Eos fit line of a given pseudo in the given configuration.
-The widget NuMeasure showing Nicola's Nu measure of all pseudos in all configurations"""
+The widget AccuracyMeritWidget showing Nicola's Nu measure of all pseudos in all configurations"""
 import ipywidgets as ipw
 import matplotlib.pyplot as plt
 import numpy as np
@@ -23,45 +23,44 @@ def birch_murnaghan(V, E0, V0, B0, B01):
     )
 
 
-class NuMeasure(ipw.VBox):
+class AccuracyMeritWidget(ipw.VBox):
+    """Widget for showing accuracy merit of a given pseudo over all configuration.
+    The merit can be either nu or delta.
+    """
 
     pseudos = traitlets.Dict(allow_none=True)
+    merit_type = traitlets.Unicode(default_value="nu")
 
     def __init__(self):
-        self.out_nu = ipw.Output()
-        self.out_delta = ipw.Output()
-
-        # measure button
-        self.measure_tab = ipw.Tab()
-        self.measure_tab.set_title(0, "ν-factor")
-        self.measure_tab.set_title(1, "Δ-factor")
-
-        self.measure_tab.children = [self.out_nu, self.out_delta]
+        self.out_plot = ipw.Output()
 
         super().__init__(
             children=[
-                self.measure_tab,
+                self.out_plot,
             ],
         )
 
+    @traitlets.observe("merit_type")
+    def _on_merit_type_change(self, change):
+        if change["new"]:
+            self.update_plot()
+
     @traitlets.observe("pseudos")
     def _on_pseudos_change(self, change):
-
+        """Update the plot when pseudos are changed."""
         if change["new"]:
-            self.layout.visibility = "visible"
-            with self.out_nu:
-                clear_output()
-                fig = self._render_plot(change["new"], "nu")
-                fig.canvas.header_visible = False
-                display(fig.canvas)
-
-            with self.out_delta:
-                clear_output()
-                fig = self._render_plot(change["new"], "delta")
-                fig.canvas.header_visible = False
-                display(fig.canvas)
+            self.layout.display = "block"
+            self.update_plot()
         else:
-            self.layout.visibility = "hidden"
+            self.layout.display = "none"
+
+    def update_plot(self):
+        """Update the plot with the current pseudos and measure type."""
+        with self.out_plot:
+            clear_output()
+            fig = self._render_plot(self.pseudos, self.merit_type)
+            fig.canvas.header_visible = False
+            display(fig.canvas)
 
     @staticmethod
     def _render_plot(pseudos: dict, measure_type):
@@ -118,11 +117,15 @@ class NuMeasure(ipw.VBox):
             )
             ax.set_title(f"X={element}")
 
+        if max(y_delta) < 8.0:
+            y_max = 10 / 8.0 * max(y_delta)
+        else:
+            y_max = 10.0
+
         ax.legend(loc="upper left", prop={"size": 10})
         ax.axhline(y=1.0, linestyle="--", color="gray")
         ax.set_ylabel(ylabel)
-        ax.set_ylim([0, 10])
-        ax.set_yticks(np.arange(10))
+        ax.set_ylim([0, y_max])
         ax.set_xticks(range(len(xticklabels)))
         ax.set_xticklabels(xticklabels)
 

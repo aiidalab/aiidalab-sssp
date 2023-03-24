@@ -42,10 +42,23 @@ class SummaryWidget(ipw.VBox):
         self.toggle_show_dual_or_rho.observe(
             self._on_toggle_show_dual_or_rho_change, names="value"
         )
+        self.toggle_measure_type = ipw.ToggleButtons(
+            options=[
+                ("ν", "nu"),
+                ("Δ", "delta"),
+            ],
+            value="nu",
+            tooltip="Toggle to switch between nu and delta",
+        )
+        self.toggle_measure_type.observe(
+            self._on_toggle_measure_type_change, names="value"
+        )
 
         super().__init__(
             children=[
                 self.accuracy_summary,
+                ipw.HTML("<p> Switch between ν and Δ </p>"),
+                self.toggle_measure_type,
                 self.convergence_summary,
                 ipw.HTML("<p> Switch criteria to: </p>"),
                 self.toggle_criteria,
@@ -53,6 +66,33 @@ class SummaryWidget(ipw.VBox):
                 self.toggle_show_dual_or_rho,
             ],
         )
+        self.layout.display = "none"
+
+    def _on_toggle_measure_type_change(self, change):
+        """When the measure type is changed, update the summary."""
+        if change["new"] is not None:
+            self.update_accuracy_summary(change["new"])
+
+    def update_accuracy_summary(self, measure_type="nu"):
+        """update accuracy summary"""
+        with self.accuracy_summary:
+            clear_output(wait=True)
+            display(self._render_accuracy(measure_type))
+
+    def update_convergence_summary(self):
+        """update convergence summary"""
+        with self.convergence_summary:
+            clear_output(wait=True)
+            display(self._render_convergence())
+
+    @traitlets.observe("pseudos")
+    def _on_pseudos_change(self, change):
+        if change["new"] is not None and len(change["new"]) > 0:
+            self.layout.display = "block"
+            self.update_accuracy_summary()
+            self.update_convergence_summary()
+        else:
+            self.layout.display = "none"
 
     def _on_toggle_show_dual_or_rho_change(self, change):
         if change["new"] == "Show ρ cutoff":
@@ -64,28 +104,11 @@ class SummaryWidget(ipw.VBox):
         else:
             self._show_dual = False
             self._show_rho = False
-        with self.convergence_summary:
-            clear_output(wait=True)
-            display(self._render_convergence())
+
+        self.update_convergence_summary()
 
     def _on_toggle_criteria_change(self, _):
-        with self.convergence_summary:
-            clear_output(wait=True)
-            display(self._render_convergence())
-
-    @traitlets.observe("pseudos")
-    def _on_pseudos_change(self, change):
-        if change["new"]:
-            self.layout.visibility = "visible"
-            with self.accuracy_summary:
-                clear_output(wait=True)
-                display(self._render_accuracy())
-
-            with self.convergence_summary:
-                clear_output(wait=True)
-                display(self._render_convergence())
-        else:
-            self.layout.visibility = "hidden"
+        self.update_convergence_summary()
 
     def _render_accuracy(self, measure_type="nu"):
         rows = []
