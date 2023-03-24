@@ -5,6 +5,7 @@ import ipywidgets as ipw
 import matplotlib.pyplot as plt
 import numpy as np
 import traitlets
+from aiida_sssp_workflow.calculations.calculate_delta import rel_errors_vec_length
 from aiida_sssp_workflow.utils import OXIDE_CONFIGURATIONS, UNARIE_CONFIGURATIONS
 from IPython.display import clear_output, display
 
@@ -233,11 +234,10 @@ class EosWidget(ipw.VBox):
         center_y = (max(energies) + min(energies)) / 2
 
         # write text of nu value in close middle
-        nu = round(data["output_parameters"]["nu"], 3)
+        nu = rel_errors_vec_length(ref_V0, ref_B0, ref_B01, V0, B0, B01)
+        nu = round(nu, 3)
         delta = round(data["output_parameters"]["delta/natoms"], 3)
-        plt.text(
-            center_x, center_y, f"$\\nu$={nu} meV/atom\n$\\Delta$={delta} meV/atom"
-        )
+        plt.text(center_x, center_y, f"$\\nu$={nu}\n$\\Delta$={delta} meV/atom")
 
         ax.legend(loc="upper center")
         ax.set_xlabel("Cell volume per formula unit ($\\AA^3$)", fontsize=8)
