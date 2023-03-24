@@ -7,7 +7,10 @@ import ipywidgets as ipw
 import matplotlib.pyplot as plt
 import numpy as np
 import traitlets
-from aiida_sssp_workflow.calculations.calculate_bands_distance import get_bands_distance
+from aiida_sssp_workflow.calculations.calculate_bands_distance import (
+    get_bands_distance,
+    retrieve_bands,
+)
 from aiida_sssp_workflow.utils import MAGNETIC_ELEMENTS, NONMETAL_ELEMENTS
 from IPython.display import clear_output, display
 from widget_bandsplot import BandsPlotWidget
@@ -19,6 +22,8 @@ from aiidalab_sssp.inspect import SSSP_DB, _px, extract_element, parse_label
 _DEGAUSS = 0.045
 _RY_TO_EV = 13.6056980659
 _FERMI_SHIFT = 10.0  # eV in protocol FIXME also change title of plot Tab widget
+
+_SMEARING_WIDTH = _DEGAUSS * _RY_TO_EV
 
 
 def _bandview(json_path):
@@ -80,31 +85,85 @@ class BandStructureWidget(ipw.VBox):
         pseudo2_label = self.pseudo2_select.value
         pseudo2 = self.pseudos.get(pseudo2_label, None)
 
-        bands = []
         if pseudo1:
             path = pseudo1["accuracy"]["bands"]["band_structure"]
             json_path = Path.joinpath(SSSP_DB, path)
 
-            band = _bandview(json_path)
-            if band:
-                bands.append(band)
+            bandsdata_a = _bandview(json_path)
 
         if pseudo2:
             path = pseudo2["accuracy"]["bands"]["band_structure"]
             json_path = Path.joinpath(SSSP_DB, path)
 
-            band = _bandview(json_path)
-            if band:
-                bands.append(band)
+            bandsdata_b = _bandview(json_path)
+
+        bandsdata_a, bandsdata_b = self.preprocess_on_bands(bandsdata_a, bandsdata_b)
 
         _band_structure_preview = BandsPlotWidget(
-            bands=bands,
-            energy_range={"ymin": -30.0, "ymax": 11.0},
+            bands=[bandsdata_a, bandsdata_b],
+            energy_range={"ymin": -10.0, "ymax": 15.0},
         )
 
         with self.band_structure:
             clear_output(wait=True)
             display(_band_structure_preview)
+
+    def preprocess_on_bands(self, bandsdata_a, bandsdata_b):
+        """
+        preprocess the band data before plot
+        """
+        # post process to deserial list to numpy arrar
+        for key in ["bands", "kpoints", "weights"]:
+            bandsdata_a[key] = np.asarray(bandsdata_a[key])
+            bandsdata_b[key] = np.asarray(bandsdata_b[key])
+
+        swap_flag = False
+        # make sure always less electrons bands as a. b hase more electrons if not equal
+        if not int(bandsdata_b["number_of_electrons"]) >= int(
+            bandsdata_a["number_of_electrons"]
+        ):
+            # swap to make sure a is less electrons pseudo
+            swap_flag = True
+            bandsdata_a, bandsdata_b = bandsdata_b, bandsdata_a
+
+        assert int(bandsdata_b["number_of_electrons"]) >= int(
+            bandsdata_a["number_of_electrons"]
+        ), f"Need to be less num_bands in a {bandsdata_a['number_of_electrons']} than b {bandsdata_b['number_of_electrons']}"
+
+        num_electrons_a = int(bandsdata_a["number_of_electrons"])
+        num_electrons_b = int(bandsdata_b["number_of_electrons"])
+
+        # divide by 2 is valid for both spin and non-spin bands, since for spin I concatenate the bands
+        # the number of bands is half of electrons
+        band_b_start_band = int(num_electrons_b - num_electrons_a) // 2
+
+        num_bands_a = bandsdata_a["number_of_bands"]
+        num_bands_b = bandsdata_b["number_of_bands"] - band_b_start_band
+
+        num_bands = min(num_bands_a, num_bands_b)
+
+        element = extract_element(self.pseudos)
+        do_smearing = element not in NONMETAL_ELEMENTS
+        smearing = _SMEARING_WIDTH
+
+        bandsdata_a = retrieve_bands(
+            bandsdata_a, 0, num_bands, num_electrons_a, smearing, do_smearing
+        )
+
+        bandsdata_b = retrieve_bands(
+            bandsdata_b,
+            band_b_start_band,
+            num_bands,
+            num_electrons_b,
+            smearing,
+            do_smearing,
+        )
+
+        # swap back
+        if swap_flag:
+            bandsdata_a, bandsdata_b = bandsdata_b, bandsdata_a
+
+        return bandsdata_a, bandsdata_b
 
 
 class BandChessboard(ipw.VBox):
@@ -234,7 +293,7 @@ class BandChessboard(ipw.VBox):
                 distance = get_bands_distance(
                     bandsdata_a=bandsdata1,
                     bandsdata_b=bandsdata2,
-                    smearing=_DEGAUSS * _RY_TO_EV,
+                    smearing=_SMEARING_WIDTH,
                     fermi_shift=fermi_shift,
                     do_smearing=do_smearing,
                     spin=spin,
