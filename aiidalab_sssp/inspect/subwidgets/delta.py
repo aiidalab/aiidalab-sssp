@@ -217,7 +217,7 @@ class EosWidget(ipw.VBox):
         ax.tick_params(axis="y", labelsize=6, rotation=45)
 
         ax.plot(volumes, energies, "ob", label="RAW equation of state")
-        ax.plot(dense_volumes, ae_eos_fit_energy, "-b", label="AE WIEN2K")
+        ax.plot(dense_volumes, ae_eos_fit_energy, "-b", label="AE reference")
         ax.axvline(V0, linestyle="--", color="gray")
 
         ax.plot(dense_volumes, psp_eos_fit_energy, "-r", label=f"{configuration} fit")
@@ -233,7 +233,7 @@ class EosWidget(ipw.VBox):
         center_y = (max(energies) + min(energies)) / 2
 
         # write text of nu value in close middle
-        nu = round(data["output_parameters"]["nu/natoms"], 3)
+        nu = round(data["output_parameters"]["nu"], 3)
         delta = round(data["output_parameters"]["delta/natoms"], 3)
         plt.text(
             center_x, center_y, f"$\\nu$={nu} meV/atom\n$\\Delta$={delta} meV/atom"
@@ -242,3 +242,5 @@ class EosWidget(ipw.VBox):
         ax.legend(loc="upper center")
         ax.set_xlabel("Cell volume per formula unit ($\\AA^3$)", fontsize=8)
         ax.set_ylabel("$E - TS$ per formula unit (eV)", fontsize=8)
+
+        ax.get_yaxis().set_ticks([])
