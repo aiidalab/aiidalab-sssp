@@ -166,7 +166,7 @@ class BandChessboard(ipw.VBox):
         for idx, (ax, arr, title) in enumerate(
             [(ax_v, arr_v, r"$\eta_v$"), (ax_c, arr_c, r"$\eta_{10}$")]
         ):
-            ax.imshow(arr)
+            ax.imshow(arr, vmin=0, vmax=50, cmap="viridis")
 
             # Show all ticks and label them with the respective list entries
             # We want to show all ticks...
