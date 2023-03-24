@@ -85,12 +85,13 @@ class NuMeasure(ipw.VBox):
             ylabel = "ν -factor"
 
         xticklabels = []
+
         for i, (label, output) in enumerate(pseudos.items()):
             # update xticklabel to include all configurations in output
             if len(xticklabels) < len(conf_list[label]):
                 xticklabels = conf_list[label]
 
-            width = 0.05  # the width of the bars
+            width = 0.6 / len(pseudos)
 
             y_delta = []
             for configuration in conf_list[label]:
@@ -117,7 +118,7 @@ class NuMeasure(ipw.VBox):
             )
             ax.set_title(f"X={element}")
 
-        ax.legend(loc="upper left", prop={"size": 6})
+        ax.legend(loc="upper left", prop={"size": 10})
         ax.axhline(y=1.0, linestyle="--", color="gray")
         ax.set_ylabel(ylabel)
         ax.set_ylim([0, 10])
