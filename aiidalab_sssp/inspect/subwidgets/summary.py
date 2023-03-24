@@ -1,12 +1,14 @@
 import ipywidgets as ipw
 import pandas as pd
 import traitlets
+from aiida_sssp_workflow.calculations.calculate_delta import rel_errors_vec_length
 from aiida_sssp_workflow.workflows.verifications import (
     DEFAULT_CONVERGENCE_PROPERTIES_LIST,
 )
 from IPython.display import clear_output, display
 
 from aiidalab_sssp.inspect import extract_element, get_conf_list, parse_label
+from aiidalab_sssp.inspect.subwidgets.utils import CONFIGURATIONS
 
 
 class SummaryWidget(ipw.VBox):
@@ -85,26 +87,35 @@ class SummaryWidget(ipw.VBox):
         else:
             self.layout.visibility = "hidden"
 
-    def _render_accuracy(self):
+    def _render_accuracy(self, measure_type="nu"):
         rows = []
         element = extract_element(self.pseudos)
-        conf_list = get_conf_list(element)
+        conf_list = [
+            i for i in CONFIGURATIONS if i in get_conf_list(element) and i != "TYPICAL"
+        ]
         columns = ["Pseudopotential label"] + conf_list
         for label, pseudo_out in self.pseudos.items():
-            _data = pseudo_out["accuracy"]["delta"]["output_parameters"]
-            nu_list = []
+            _data = pseudo_out["accuracy"]["delta"]
+            y_list = []
             for i in conf_list:
-                nu = _data.get(i, {}).get("nu/natoms", None)
-                if nu:
-                    nu_list.append(round(nu, 3))
+                output_parameters = _data.get(i, {}).get("output_parameters", {})
+                if measure_type == "delta":
+                    y = output_parameters["delta/natoms"]
+                else:
+                    v0w, b0w, b1w = output_parameters["birch_murnaghan_results"]
+                    v0f, b0f, b1f = output_parameters["reference_wien2k_V0_B0_B1"]
+                    y = rel_errors_vec_length(v0w, b0w, b1w, v0f, b0f, b1f)
+
+                if y:
+                    y_list.append(round(y, 3))
                 else:
                     # there is no delta/nu result for this conf of this pseudo
                     # print("Cannot find nu value of pseudo={label}, conf={i}")
                     # it will show in summary table as 'nan'
-                    nu_list.append("nan")
+                    y_list.append("nan")
 
             output_label = parse_label(label)["representive_label"]
-            rows.append([output_label, *nu_list])
+            rows.append([output_label, *y_list])
 
         df = pd.DataFrame(rows, columns=columns)
         df.style.hide_index()

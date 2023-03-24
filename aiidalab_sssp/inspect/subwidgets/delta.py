@@ -6,12 +6,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import traitlets
 from aiida_sssp_workflow.calculations.calculate_delta import rel_errors_vec_length
-from aiida_sssp_workflow.utils import OXIDE_CONFIGURATIONS, UNARIE_CONFIGURATIONS
 from IPython.display import clear_output, display
 
 from aiidalab_sssp.inspect import _px, cmap, extract_element, parse_label
-
-CONFIGURATIONS = OXIDE_CONFIGURATIONS + UNARIE_CONFIGURATIONS + ["RE", "TYPICAL"]
+from aiidalab_sssp.inspect.subwidgets.utils import CONFIGURATIONS
 
 
 def birch_murnaghan(V, E0, V0, B0, B01):
@@ -74,16 +72,16 @@ class NuMeasure(ipw.VBox):
         conf_list = {}
         for label, data in pseudos.items():
             _data = data["accuracy"]["delta"]
-            conf_list[label] = [i for i in _data.keys() if i in CONFIGURATIONS]
+            conf_list[label] = [
+                i for i in CONFIGURATIONS if i in _data.keys() and i != "TYPICAL"
+            ]
 
         # element
         element = extract_element(pseudos)
 
         if measure_type == "delta":
-            keyname = "delta/natoms"
             ylabel = "Δ -factor"
         elif measure_type == "nu":
-            keyname = "nu/natoms"
             ylabel = "ν -factor"
 
         xticklabels = []
@@ -96,8 +94,14 @@ class NuMeasure(ipw.VBox):
 
             y_delta = []
             for configuration in conf_list[label]:
-                res = output["accuracy"]["delta"]["output_parameters"][configuration]
-                y_delta.append(res[keyname])
+                res = output["accuracy"]["delta"][configuration]["output_parameters"]
+                if measure_type == "delta":
+                    y_delta.append(res["delta/natoms"])
+                if measure_type == "nu":
+                    v0w, b0w, b1w = res["birch_murnaghan_results"]
+                    v0f, b0f, b1f = res["reference_wien2k_V0_B0_B1"]
+                    nu = rel_errors_vec_length(v0w, b0w, b1w, v0f, b0f, b1f)
+                    y_delta.append(nu)
 
             x = np.arange(len(conf_list[label]))
             pseudo_info = parse_label(label)
@@ -159,7 +163,7 @@ class EosWidget(ipw.VBox):
             label = change["new"]
             _data = self.pseudos[label]["accuracy"]["delta"]
 
-            configuration_list = [i for i in _data.keys() if i in CONFIGURATIONS]
+            configuration_list = [i for i in CONFIGURATIONS if i in _data.keys()]
             self.select_configuration.options = configuration_list
 
             self._render()
