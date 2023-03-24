@@ -1,12 +1,14 @@
 import ipywidgets as ipw
 import pandas as pd
 import traitlets
+from aiida_sssp_workflow.calculations.calculate_delta import rel_errors_vec_length
 from aiida_sssp_workflow.workflows.verifications import (
     DEFAULT_CONVERGENCE_PROPERTIES_LIST,
 )
 from IPython.display import clear_output, display
 
 from aiidalab_sssp.inspect import extract_element, get_conf_list, parse_label
+from aiidalab_sssp.inspect.subwidgets.utils import CONFIGURATIONS
 
 
 class SummaryWidget(ipw.VBox):
@@ -40,10 +42,23 @@ class SummaryWidget(ipw.VBox):
         self.toggle_show_dual_or_rho.observe(
             self._on_toggle_show_dual_or_rho_change, names="value"
         )
+        self.toggle_measure_type = ipw.ToggleButtons(
+            options=[
+                ("ν", "nu"),
+                ("Δ", "delta"),
+            ],
+            value="nu",
+            tooltip="Toggle to switch between nu and delta",
+        )
+        self.toggle_measure_type.observe(
+            self._on_toggle_measure_type_change, names="value"
+        )
 
         super().__init__(
             children=[
                 self.accuracy_summary,
+                ipw.HTML("<p> Switch between ν and Δ </p>"),
+                self.toggle_measure_type,
                 self.convergence_summary,
                 ipw.HTML("<p> Switch criteria to: </p>"),
                 self.toggle_criteria,
@@ -51,6 +66,33 @@ class SummaryWidget(ipw.VBox):
                 self.toggle_show_dual_or_rho,
             ],
         )
+        self.layout.display = "none"
+
+    def _on_toggle_measure_type_change(self, change):
+        """When the measure type is changed, update the summary."""
+        if change["new"] is not None:
+            self.update_accuracy_summary(change["new"])
+
+    def update_accuracy_summary(self, measure_type="nu"):
+        """update accuracy summary"""
+        with self.accuracy_summary:
+            clear_output(wait=True)
+            display(self._render_accuracy(measure_type))
+
+    def update_convergence_summary(self):
+        """update convergence summary"""
+        with self.convergence_summary:
+            clear_output(wait=True)
+            display(self._render_convergence())
+
+    @traitlets.observe("pseudos")
+    def _on_pseudos_change(self, change):
+        if change["new"] is not None and len(change["new"]) > 0:
+            self.layout.display = "block"
+            self.update_accuracy_summary()
+            self.update_convergence_summary()
+        else:
+            self.layout.display = "none"
 
     def _on_toggle_show_dual_or_rho_change(self, change):
         if change["new"] == "Show ρ cutoff":
@@ -62,49 +104,41 @@ class SummaryWidget(ipw.VBox):
         else:
             self._show_dual = False
             self._show_rho = False
-        with self.convergence_summary:
-            clear_output(wait=True)
-            display(self._render_convergence())
+
+        self.update_convergence_summary()
 
     def _on_toggle_criteria_change(self, _):
-        with self.convergence_summary:
-            clear_output(wait=True)
-            display(self._render_convergence())
+        self.update_convergence_summary()
 
-    @traitlets.observe("pseudos")
-    def _on_pseudos_change(self, change):
-        if change["new"]:
-            self.layout.visibility = "visible"
-            with self.accuracy_summary:
-                clear_output(wait=True)
-                display(self._render_accuracy())
-
-            with self.convergence_summary:
-                clear_output(wait=True)
-                display(self._render_convergence())
-        else:
-            self.layout.visibility = "hidden"
-
-    def _render_accuracy(self):
+    def _render_accuracy(self, measure_type="nu"):
         rows = []
         element = extract_element(self.pseudos)
-        conf_list = get_conf_list(element)
+        conf_list = [
+            i for i in CONFIGURATIONS if i in get_conf_list(element) and i != "TYPICAL"
+        ]
         columns = ["Pseudopotential label"] + conf_list
         for label, pseudo_out in self.pseudos.items():
-            _data = pseudo_out["accuracy"]["delta"]["output_parameters"]
-            nu_list = []
+            _data = pseudo_out["accuracy"]["delta"]
+            y_list = []
             for i in conf_list:
-                nu = _data.get(i, {}).get("nu/natoms", None)
-                if nu:
-                    nu_list.append(round(nu, 3))
+                output_parameters = _data.get(i, {}).get("output_parameters", {})
+                if measure_type == "delta":
+                    y = output_parameters["delta/natoms"]
+                else:
+                    v0w, b0w, b1w = output_parameters["birch_murnaghan_results"]
+                    v0f, b0f, b1f = output_parameters["reference_wien2k_V0_B0_B1"]
+                    y = rel_errors_vec_length(v0w, b0w, b1w, v0f, b0f, b1f)
+
+                if y:
+                    y_list.append(round(y, 3))
                 else:
                     # there is no delta/nu result for this conf of this pseudo
                     # print("Cannot find nu value of pseudo={label}, conf={i}")
                     # it will show in summary table as 'nan'
-                    nu_list.append("nan")
+                    y_list.append("nan")
 
             output_label = parse_label(label)["representive_label"]
-            rows.append([output_label, *nu_list])
+            rows.append([output_label, *y_list])
 
         df = pd.DataFrame(rows, columns=columns)
         df.style.hide_index()
