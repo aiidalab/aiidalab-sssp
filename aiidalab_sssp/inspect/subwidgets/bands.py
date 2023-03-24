@@ -7,12 +7,14 @@ import ipywidgets as ipw
 import matplotlib.pyplot as plt
 import numpy as np
 import traitlets
-from aiida_sssp_workflow.utils import NONMETAL_ELEMENTS
+from aiida_sssp_workflow.calculations.calculate_bands_distance import get_bands_distance
+from aiida_sssp_workflow.utils import MAGNETIC_ELEMENTS, NONMETAL_ELEMENTS
 from IPython.display import clear_output, display
 from widget_bandsplot import BandsPlotWidget
 
 from aiidalab_sssp.inspect import SSSP_DB, _px, extract_element, parse_label
-from aiidalab_sssp.inspect.band_util import get_bands_distance
+
+# from aiidalab_sssp.inspect.band_util import get_bands_distance
 
 _DEGAUSS = 0.045
 _RY_TO_EV = 13.6056980659
@@ -227,13 +229,15 @@ class BandChessboard(ipw.VBox):
                     os.path.join(SSSP_DB, pseudos[label2]["accuracy"]["bands"]["bands"])
                 )
 
+                spin = element is not None and element in MAGNETIC_ELEMENTS
+
                 distance = get_bands_distance(
-                    element=element,
                     bandsdata_a=bandsdata1,
                     bandsdata_b=bandsdata2,
                     smearing=_DEGAUSS * _RY_TO_EV,
                     fermi_shift=fermi_shift,
                     do_smearing=do_smearing,
+                    spin=spin,
                 )
                 self.__cache_bands[cache_key] = distance
 
