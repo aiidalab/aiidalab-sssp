@@ -143,7 +143,7 @@ class EosComparisonWidget(ipw.VBox):
     def __init__(self):
         self.select_pseudo_ref = ipw.Dropdown()
         self.select_pseudo_comp = ipw.Dropdown()
-        
+
         self._observer_on_for_pseudos_dropdown()
 
         self.select_configuration = ipw.Dropdown()
@@ -163,11 +163,11 @@ class EosComparisonWidget(ipw.VBox):
                 self.eos_preview,
             ],
         )
-        
+
     def _observer_on_for_pseudos_dropdown(self):
         self.select_pseudo_ref.observe(self._on_pseudo_select, names="value")
         self.select_pseudo_comp.observe(self._on_pseudo_select, names="value")
-        
+
     def _unobserve_on_for_pseudos_dropdown(self):
         self.select_pseudo_ref.unobserve(self._on_pseudo_select, names="value")
         self.select_pseudo_comp.unobserve(self._on_pseudo_select, names="value")
@@ -178,17 +178,17 @@ class EosComparisonWidget(ipw.VBox):
             self.layout.display = "block"
             with self.hold_trait_notifications():
                 pseudo_list = list(self.pseudos.keys())
-                
+
                 # remove the observer before update the dropdown menu
                 self._unobserve_on_for_pseudos_dropdown()
-                
+
                 # update the dropdown menu
                 self.select_pseudo_ref.options = pseudo_list
                 self.select_pseudo_comp.options = pseudo_list
-                
+
                 # update the configuration dropdown menu and select the first and second pseudo, respectively
                 self._update_configuration(pseudo_list[0], pseudo_list[1])
-                
+
                 # add the observer back
                 self._observer_on_for_pseudos_dropdown()
 
@@ -206,7 +206,7 @@ class EosComparisonWidget(ipw.VBox):
 
         self._update_configuration(label_ref, label_comp)
         self.update_plot()
-        
+
     def _update_configuration(self, ref, comp):
         """Update configuration dropdown options"""
         _data_ref = self.pseudos[ref]["accuracy"]["delta"]

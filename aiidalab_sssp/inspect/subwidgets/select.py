@@ -8,7 +8,6 @@ BASE_DOWNLOAD_URL = (
 )
 
 
-
 class SelectMultipleCheckbox(ipw.VBox):
     """Widget with a search field and lots of checkboxes of pseudopotentials"""
 
@@ -116,8 +115,8 @@ class SelectMultipleCheckbox(ipw.VBox):
 
 class PseudoSelectWidget(ipw.VBox):
     # (input) all pseudos of a element, the whole dict from json fixed once element choosen
-    pseudos = traitlets.Dict(allow_none=True)   
-    
+    pseudos = traitlets.Dict(allow_none=True)
+
     # (output) selected pseudos of a element, the whole dict once pseudos selected
     selected_pseudos = traitlets.Dict(allow_none=True)
 
@@ -170,14 +169,14 @@ class PseudoSelectWidget(ipw.VBox):
             with self.hold_trait_notifications():
                 self.select_buttons.layout.visibility = "visible"
                 # if select/unselect new element update prompt help info
-                self.help_info.value = (
-                    f"Please choose pseudopotentials to inspect:"
-                )
+                self.help_info.value = "Please choose pseudopotentials to inspect:"
 
                 # self.pseudos store all dict for the element the initial parsed from element json
                 # select all pseudos of element as default
                 self.multiple_selection.options = list(self.pseudos.keys())
-                self.selected_pseudos = self.pseudos.copy()    # the traitlets need to be a copy of the dict otherwise it will not trigger the change event
+                self.selected_pseudos = (
+                    self.pseudos.copy()
+                )  # the traitlets need to be a copy of the dict otherwise it will not trigger the change event
         else:
             # if empty dict passed (by unseleted the element) reset multiple select widget
             self.reset()

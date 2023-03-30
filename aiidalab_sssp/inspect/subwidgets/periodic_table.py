@@ -1,5 +1,5 @@
-import os
 import json
+import os
 import shutil
 import tarfile
 from urllib import request
@@ -16,6 +16,7 @@ __all__ = ("PeriodicTable",)
 _DB_URL = "https://github.com/unkcpz/sssp-verify-scripts/raw/main/sssp_db.tar.gz"
 _DB_FOLDER = "sssp_db"
 
+
 def _load_pseudos(element, db=SSSP_DB) -> dict:
     """Open result json file of element return as dict"""
     if element:
@@ -30,6 +31,7 @@ def _load_pseudos(element, db=SSSP_DB) -> dict:
 
 class PeriodicTable(ipw.VBox):
     """Wrapper-widget for PTableWidget, select the element and update the dict of pseudos"""
+
     # (output) dict of pseudos for selected element
     pseudos = traitlets.Dict()
 
@@ -93,7 +95,7 @@ class PeriodicTable(ipw.VBox):
                     # first time set: len(event['new']) -> 1
                     element = list(event["new"])[0]
                     self.update_pseudos(element)
-                    
+
     def update_pseudos(self, element):
         self.pseudos = _load_pseudos(element)
 
