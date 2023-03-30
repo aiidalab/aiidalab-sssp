@@ -7,10 +7,7 @@ import ipywidgets as ipw
 import matplotlib.pyplot as plt
 import numpy as np
 import traitlets
-from aiida_sssp_workflow.calculations.calculate_bands_distance import (
-    get_bands_distance,
-    retrieve_bands,
-)
+from aiida_sssp_workflow.calculations.calculate_bands_distance import get_bands_distance
 from aiida_sssp_workflow.utils import MAGNETIC_ELEMENTS, NONMETAL_ELEMENTS
 from IPython.display import clear_output, display
 from widget_bandsplot import BandsPlotWidget
@@ -85,85 +82,45 @@ class BandStructureWidget(ipw.VBox):
         pseudo2_label = self.pseudo2_select.value
         pseudo2 = self.pseudos.get(pseudo2_label, None)
 
+        bands = []
         if pseudo1:
             path = pseudo1["accuracy"]["bands"]["band_structure"]
             json_path = Path.joinpath(SSSP_DB, path)
 
-            bandsdata_a = _bandview(json_path)
+            bandsdata_a = self.bands_align_to_fermi(_bandview(json_path))
+            bands.append(bandsdata_a)
 
         if pseudo2:
             path = pseudo2["accuracy"]["bands"]["band_structure"]
             json_path = Path.joinpath(SSSP_DB, path)
 
-            bandsdata_b = _bandview(json_path)
-
-        bandsdata_a, bandsdata_b = self.preprocess_on_bands(bandsdata_a, bandsdata_b)
+            bandsdata_b = self.bands_align_to_fermi(_bandview(json_path))
+            bands.append(bandsdata_b)
 
         _band_structure_preview = BandsPlotWidget(
-            bands=[bandsdata_a, bandsdata_b],
+            bands=bands,
             energy_range={"ymin": -10.0, "ymax": 15.0},
+            fermi_energy=0.0,  # since we have aligned to fermi level
         )
 
         with self.band_structure:
             clear_output(wait=True)
             display(_band_structure_preview)
 
-    def preprocess_on_bands(self, bandsdata_a, bandsdata_b):
+    def bands_align_to_fermi(self, bandsdata):
         """
-        preprocess the band data before plot
+        align the band structure to fermi level
         """
-        # post process to deserial list to numpy arrar
-        for key in ["bands", "kpoints", "weights"]:
-            bandsdata_a[key] = np.asarray(bandsdata_a[key])
-            bandsdata_b[key] = np.asarray(bandsdata_b[key])
+        fermi_energy = bandsdata["fermi_level"]
 
-        swap_flag = False
-        # make sure always less electrons bands as a. b hase more electrons if not equal
-        if not int(bandsdata_b["number_of_electrons"]) >= int(
-            bandsdata_a["number_of_electrons"]
-        ):
-            # swap to make sure a is less electrons pseudo
-            swap_flag = True
-            bandsdata_a, bandsdata_b = bandsdata_b, bandsdata_a
+        for path in bandsdata["paths"]:
+            values = [[y - fermi_energy for y in ys] for ys in path["values"]]
+            path["values"] = values
 
-        assert int(bandsdata_b["number_of_electrons"]) >= int(
-            bandsdata_a["number_of_electrons"]
-        ), f"Need to be less num_bands in a {bandsdata_a['number_of_electrons']} than b {bandsdata_b['number_of_electrons']}"
+        # After align to fermi level, we need to update the fermi level to 0.0
+        bandsdata["fermi_level"] = 0.0
 
-        num_electrons_a = int(bandsdata_a["number_of_electrons"])
-        num_electrons_b = int(bandsdata_b["number_of_electrons"])
-
-        # divide by 2 is valid for both spin and non-spin bands, since for spin I concatenate the bands
-        # the number of bands is half of electrons
-        band_b_start_band = int(num_electrons_b - num_electrons_a) // 2
-
-        num_bands_a = bandsdata_a["number_of_bands"]
-        num_bands_b = bandsdata_b["number_of_bands"] - band_b_start_band
-
-        num_bands = min(num_bands_a, num_bands_b)
-
-        element = extract_element(self.pseudos)
-        do_smearing = element not in NONMETAL_ELEMENTS
-        smearing = _SMEARING_WIDTH
-
-        bandsdata_a = retrieve_bands(
-            bandsdata_a, 0, num_bands, num_electrons_a, smearing, do_smearing
-        )
-
-        bandsdata_b = retrieve_bands(
-            bandsdata_b,
-            band_b_start_band,
-            num_bands,
-            num_electrons_b,
-            smearing,
-            do_smearing,
-        )
-
-        # swap back
-        if swap_flag:
-            bandsdata_a, bandsdata_b = bandsdata_b, bandsdata_a
-
-        return bandsdata_a, bandsdata_b
+        return bandsdata
 
 
 class BandChessboard(ipw.VBox):
