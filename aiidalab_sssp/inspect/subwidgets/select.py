@@ -1,26 +1,12 @@
-import json
-import os
-
 import ipywidgets as ipw
 import traitlets
 
-from aiidalab_sssp.inspect import SSSP_DB, parse_label
+from aiidalab_sssp.inspect import parse_label
 
 BASE_DOWNLOAD_URL = (
     "https://raw.githubusercontent.com/unkcpz/sssp-verify-scripts/main/libraries-pbe"
 )
 
-
-def _load_pseudos(element, db=SSSP_DB) -> dict:
-    """Open result json file of element return as dict"""
-    if element:
-        json_fn = os.path.join(db, f"{element}.json")
-        with open(json_fn, "r") as fh:
-            pseudos = json.load(fh)
-
-        return {key: pseudos[key] for key in sorted(pseudos.keys(), key=str.lower)}
-
-    return dict()
 
 
 class SelectMultipleCheckbox(ipw.VBox):
@@ -129,22 +115,20 @@ class SelectMultipleCheckbox(ipw.VBox):
 
 
 class PseudoSelectWidget(ipw.VBox):
-    element = traitlets.Unicode(allow_none=True)
+    # (input) all pseudos of a element, the whole dict from json fixed once element choosen
+    pseudos = traitlets.Dict(allow_none=True)   
+    
+    # (output) selected pseudos of a element, the whole dict once pseudos selected
     selected_pseudos = traitlets.Dict(allow_none=True)
 
-    NO_ELEMENT_INFO = "No element is selected"
-
     def __init__(self):
-        # store all pseudos of a element, the whole dict from json fixed once
-        # element choosen
-        self._element_pseudos = {}
-
-        self.help_info = ipw.HTML(self.NO_ELEMENT_INFO)
-        self.reset_select = ipw.Button(
+        self.NO_PSEUDOS_FOR_SELECT_INFO = "No pseudopotentials available for compare, please select an element or upload a verification file."
+        self.help_info = ipw.HTML(self.NO_PSEUDOS_FOR_SELECT_INFO)
+        self.unselect_all = ipw.Button(
             description="Unselect All",
             button_style="info",
         )
-        self.reset_select.on_click(self._on_reset_click)
+        self.unselect_all.on_click(self._unselect_all_click)
 
         self.select_all = ipw.Button(
             description="Select All",
@@ -152,8 +136,8 @@ class PseudoSelectWidget(ipw.VBox):
         )
         self.select_all.on_click(self._on_select_all_click)
 
-        self.select_buttons = ipw.HBox(children=[self.reset_select, self.select_all])
-        self.select_buttons.layout.visibility = "hidden"
+        self.select_buttons = ipw.HBox(children=[self.unselect_all, self.select_all])
+        self.select_buttons.layout.display = "none"
 
         self.multiple_selection = SelectMultipleCheckbox(
             disabled=False, layout=ipw.Layout(width="98%")
@@ -170,7 +154,7 @@ class PseudoSelectWidget(ipw.VBox):
             ]
         )
 
-    def _on_reset_click(self, _):
+    def _unselect_all_click(self, _):
         """Unselect all"""
         # self.selected_pseudos = {}
         self.multiple_selection.unselecet_all()
@@ -180,32 +164,31 @@ class PseudoSelectWidget(ipw.VBox):
         # self.selected_pseudos = _load_pseudos(self.element)
         self.multiple_selection.selecet_all()
 
-    @traitlets.observe("element")
-    def _observe_elements(self, change):
-        if change["new"]:
-            self.select_buttons.layout.visibility = "visible"
+    @traitlets.observe("pseudos")
+    def _observe_pseudos(self, change):
+        if change["new"] is not None and change["new"] != {}:  # pseudos is not empty
+            self.select_buttons.layout.display = "flex"  # show select/unselect all buttons
             # if select/unselect new element update prompt help info
             self.help_info.value = (
-                f"Please choose pseudopotentials of element {self.element} to inspect:"
+                f"Please choose pseudopotentials to inspect:"
             )
 
-            # If an element is chosen update checkbox list
             # self.pseudos store all dict for the element the initial parsed from element json
             # select all pseudos of element as default
-            self._element_pseudos = _load_pseudos(self.element)
-            self.multiple_selection.options = list(self._element_pseudos.keys())
-            self.selected_pseudos = self._element_pseudos.copy()
+            self.multiple_selection.options = list(self.pseudos.keys())
+            self.selected_pseudos = self.pseudos.copy()    # the traitlets need to be a copy of the dict otherwise it will not trigger the change event
         else:
-            # element is unselected reset multiple select widget
+            # if empty dict passed (by unseleted the element) reset multiple select widget
             self.reset()
 
     def _on_multiple_selection_change(self, change):
         self.selected_pseudos = {
-            k: self._element_pseudos[k] for k in sorted(change["new"], key=str.lower)
+            k: self.pseudos[k] for k in sorted(change["new"], key=str.lower)
         }
 
     def reset(self):
+        """Reset the widget to initial state, no checkbox widget at all"""
         self.select_buttons.layout.visibility = "hidden"
-        self.help_info.value = self.NO_ELEMENT_INFO
+        self.help_info.value = self.NO_PSEUDOS_FOR_SELECT_INFO
         self.multiple_selection.options = list()
         self.selected_pseudos = {}

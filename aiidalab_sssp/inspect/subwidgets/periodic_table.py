@@ -1,4 +1,5 @@
 import os
+import json
 import shutil
 import tarfile
 from urllib import request
@@ -7,17 +8,30 @@ import ipywidgets as ipw
 import traitlets
 from widget_periodictable import PTableWidget
 
+from aiidalab_sssp.inspect import SSSP_DB
+
 __all__ = ("PeriodicTable",)
 
 
 _DB_URL = "https://github.com/unkcpz/sssp-verify-scripts/raw/main/sssp_db.tar.gz"
 _DB_FOLDER = "sssp_db"
 
+def _load_pseudos(element, db=SSSP_DB) -> dict:
+    """Open result json file of element return as dict"""
+    if element:
+        json_fn = os.path.join(db, f"{element}.json")
+        with open(json_fn, "r") as fh:
+            pseudos = json.load(fh)
+
+        return {key: pseudos[key] for key in sorted(pseudos.keys(), key=str.lower)}
+
+    return dict()
+
 
 class PeriodicTable(ipw.VBox):
-    """Wrapper-widget for PTableWidget"""
-
-    selected_element = traitlets.Unicode(allow_none=True)
+    """Wrapper-widget for PTableWidget, select the element and update the dict of pseudos"""
+    # (output) dict of pseudos for selected element
+    pseudos = traitlets.Dict()
 
     def __init__(self, cache_folder, **kwargs):
         self._disabled = kwargs.get("disabled", False)
@@ -70,14 +84,18 @@ class PeriodicTable(ipw.VBox):
                     if newly_selected:
                         element = list(newly_selected)[0]
                         self.ptable.selected_elements = {element: 0}
-                        self.selected_element = element
+                        self.update_pseudos(element)
                     else:
                         self.reset()
                     # To have the correct 'last' value for next calls
                     self._last_selected = self.ptable.selected_elements
                 else:
                     # first time set: len(event['new']) -> 1
-                    self.selected_element = list(event["new"])[0]
+                    element = list(event["new"])[0]
+                    self.update_pseudos(element)
+                    
+    def update_pseudos(self, element):
+        self.pseudos = _load_pseudos(element)
 
     def _update_db(self, _=None, download=True):
         """update cached db fetch from remote. and update ptable"""
