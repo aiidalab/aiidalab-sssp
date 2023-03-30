@@ -137,7 +137,7 @@ class PseudoSelectWidget(ipw.VBox):
         self.select_all.on_click(self._on_select_all_click)
 
         self.select_buttons = ipw.HBox(children=[self.unselect_all, self.select_all])
-        self.select_buttons.layout.display = "none"
+        self.select_buttons.layout.visibility = "hidden"
 
         self.multiple_selection = SelectMultipleCheckbox(
             disabled=False, layout=ipw.Layout(width="98%")
@@ -167,7 +167,7 @@ class PseudoSelectWidget(ipw.VBox):
     @traitlets.observe("pseudos")
     def _observe_pseudos(self, change):
         if change["new"] is not None and change["new"] != {}:  # pseudos is not empty
-            self.select_buttons.layout.display = "flex"  # show select/unselect all buttons
+            self.select_buttons.layout.visibility = "visible"
             # if select/unselect new element update prompt help info
             self.help_info.value = (
                 f"Please choose pseudopotentials to inspect:"
