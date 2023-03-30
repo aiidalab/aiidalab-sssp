@@ -142,10 +142,9 @@ class EosComparisonWidget(ipw.VBox):
 
     def __init__(self):
         self.select_pseudo_ref = ipw.Dropdown()
-        self.select_pseudo_ref.observe(self._on_pseudo_select, names="value")
-
         self.select_pseudo_comp = ipw.Dropdown()
-        self.select_pseudo_comp.observe(self._on_pseudo_select, names="value")
+        
+        self._observer_on_for_pseudos_dropdown()
 
         self.select_configuration = ipw.Dropdown()
         self.select_configuration.observe(self._on_configuration_change, names="value")
@@ -164,6 +163,14 @@ class EosComparisonWidget(ipw.VBox):
                 self.eos_preview,
             ],
         )
+        
+    def _observer_on_for_pseudos_dropdown(self):
+        self.select_pseudo_ref.observe(self._on_pseudo_select, names="value")
+        self.select_pseudo_comp.observe(self._on_pseudo_select, names="value")
+        
+    def _unobserve_on_for_pseudos_dropdown(self):
+        self.select_pseudo_ref.unobserve(self._on_pseudo_select, names="value")
+        self.select_pseudo_comp.unobserve(self._on_pseudo_select, names="value")
 
     @traitlets.observe("pseudos")
     def _on_pseudos_change(self, change):
@@ -171,8 +178,19 @@ class EosComparisonWidget(ipw.VBox):
             self.layout.display = "block"
             with self.hold_trait_notifications():
                 pseudo_list = list(self.pseudos.keys())
+                
+                # remove the observer before update the dropdown menu
+                self._unobserve_on_for_pseudos_dropdown()
+                
+                # update the dropdown menu
                 self.select_pseudo_ref.options = pseudo_list
                 self.select_pseudo_comp.options = pseudo_list
+                
+                # update the configuration dropdown menu and select the first and second pseudo, respectively
+                self._update_configuration(pseudo_list[0], pseudo_list[1])
+                
+                # add the observer back
+                self._observer_on_for_pseudos_dropdown()
 
             self.update_plot()
         else:
@@ -186,8 +204,13 @@ class EosComparisonWidget(ipw.VBox):
         if label_ref is None or label_comp is None:
             return
 
-        _data_ref = self.pseudos[label_ref]["accuracy"]["delta"]
-        _data_comp = self.pseudos[label_comp]["accuracy"]["delta"]
+        self._update_configuration(label_ref, label_comp)
+        self.update_plot()
+        
+    def _update_configuration(self, ref, comp):
+        """Update configuration dropdown options"""
+        _data_ref = self.pseudos[ref]["accuracy"]["delta"]
+        _data_comp = self.pseudos[comp]["accuracy"]["delta"]
 
         # The configuration list is the intersection of two pseudos
         self.select_configuration.options = [

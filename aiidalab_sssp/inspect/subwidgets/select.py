@@ -167,28 +167,31 @@ class PseudoSelectWidget(ipw.VBox):
     @traitlets.observe("pseudos")
     def _observe_pseudos(self, change):
         if change["new"] is not None and change["new"] != {}:  # pseudos is not empty
-            self.select_buttons.layout.visibility = "visible"
-            # if select/unselect new element update prompt help info
-            self.help_info.value = (
-                f"Please choose pseudopotentials to inspect:"
-            )
+            with self.hold_trait_notifications():
+                self.select_buttons.layout.visibility = "visible"
+                # if select/unselect new element update prompt help info
+                self.help_info.value = (
+                    f"Please choose pseudopotentials to inspect:"
+                )
 
-            # self.pseudos store all dict for the element the initial parsed from element json
-            # select all pseudos of element as default
-            self.multiple_selection.options = list(self.pseudos.keys())
-            self.selected_pseudos = self.pseudos.copy()    # the traitlets need to be a copy of the dict otherwise it will not trigger the change event
+                # self.pseudos store all dict for the element the initial parsed from element json
+                # select all pseudos of element as default
+                self.multiple_selection.options = list(self.pseudos.keys())
+                self.selected_pseudos = self.pseudos.copy()    # the traitlets need to be a copy of the dict otherwise it will not trigger the change event
         else:
             # if empty dict passed (by unseleted the element) reset multiple select widget
             self.reset()
 
     def _on_multiple_selection_change(self, change):
-        self.selected_pseudos = {
-            k: self.pseudos[k] for k in sorted(change["new"], key=str.lower)
-        }
+        with self.hold_trait_notifications():
+            self.selected_pseudos = {
+                k: self.pseudos[k] for k in sorted(change["new"], key=str.lower)
+            }
 
     def reset(self):
         """Reset the widget to initial state, no checkbox widget at all"""
-        self.select_buttons.layout.visibility = "hidden"
-        self.help_info.value = self.NO_PSEUDOS_FOR_SELECT_INFO
-        self.multiple_selection.options = list()
-        self.selected_pseudos = {}
+        with self.hold_trait_notifications():
+            self.select_buttons.layout.visibility = "hidden"
+            self.help_info.value = self.NO_PSEUDOS_FOR_SELECT_INFO
+            self.multiple_selection.options = list()
+            self.selected_pseudos = {}
