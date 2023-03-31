@@ -96,10 +96,11 @@ class PeriodicTable(ipw.VBox):
                             f"The element name in the json file is not {self._element}, please check the json file."
                         )
 
-                if self.pseudos is None or len(self.pseudos) == 0:
-                    self.pseudos = pseudos
-                else:
-                    self.pseudos = self.pseudos.update(pseudos)
+                # if self.pseudos is None or len(self.pseudos) == 0:
+                #     self.pseudos = pseudos
+                # else:
+                #     self.pseudos = self.pseudos.update(pseudos)
+                self.update_pseudos(element=self._element, pseudos=pseudos)
 
                 # reset the upload widget to empty so that the same file can be uploaded again
                 # self.json_upload.value = {}
@@ -129,8 +130,12 @@ class PeriodicTable(ipw.VBox):
                     self._element = list(event["new"])[0]
                     self.update_pseudos(self._element)
 
-    def update_pseudos(self, element):
-        self.pseudos = _load_pseudos(element)
+    def update_pseudos(self, element=None, pseudos=None):
+        pseudos = {} if pseudos is None else pseudos
+        if element is not None:
+            pseudos.update(_load_pseudos(element))
+
+        self.pseudos = pseudos
 
     def _update_db(self, _=None, download=True):
         """update cached db fetch from remote. and update ptable"""
