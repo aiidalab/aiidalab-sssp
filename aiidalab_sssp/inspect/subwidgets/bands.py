@@ -84,15 +84,21 @@ class BandStructureWidget(ipw.VBox):
 
         bands = []
         if pseudo1:
-            path = pseudo1["accuracy"]["bands"]["band_structure"]
-            json_path = Path.joinpath(SSSP_DB, path)
+            try:
+                path = pseudo1["accuracy"]["bands"]["band_structure"]
+                json_path = Path.joinpath(SSSP_DB, path)
+            except Exception:
+                return
 
             bandsdata_a = self.bands_align_to_fermi(_bandview(json_path))
             bands.append(bandsdata_a)
 
         if pseudo2:
-            path = pseudo2["accuracy"]["bands"]["band_structure"]
-            json_path = Path.joinpath(SSSP_DB, path)
+            try:
+                path = pseudo2["accuracy"]["bands"]["band_structure"]
+                json_path = Path.joinpath(SSSP_DB, path)
+            except Exception:
+                return
 
             bandsdata_b = self.bands_align_to_fermi(_bandview(json_path))
             bands.append(bandsdata_b)
@@ -226,8 +232,10 @@ class BandChessboard(ipw.VBox):
 
         fermi_shift = _FERMI_SHIFT
 
-        arr_v = np.zeros((len(labels), len(labels)))
-        arr_c = np.zeros((len(labels), len(labels)))
+        arr_v = np.empty((len(labels), len(labels)))
+        arr_v[:] = np.nan
+        arr_c = np.empty((len(labels), len(labels)))
+        arr_c[:] = np.nan
         for (idx1, label1), (idx2, label2) in itertools.combinations(
             enumerate(labels), 2
         ):
@@ -238,12 +246,19 @@ class BandChessboard(ipw.VBox):
             if cache_key in self.__cache_bands:
                 distance = self.__cache_bands.get(cache_key)
             else:
-                bandsdata1 = _bandview(
-                    os.path.join(SSSP_DB, pseudos[label1]["accuracy"]["bands"]["bands"])
-                )
-                bandsdata2 = _bandview(
-                    os.path.join(SSSP_DB, pseudos[label2]["accuracy"]["bands"]["bands"])
-                )
+                try:
+                    bandsdata1 = _bandview(
+                        os.path.join(
+                            SSSP_DB, pseudos[label1]["accuracy"]["bands"]["bands"]
+                        )
+                    )
+                    bandsdata2 = _bandview(
+                        os.path.join(
+                            SSSP_DB, pseudos[label2]["accuracy"]["bands"]["bands"]
+                        )
+                    )
+                except KeyError:
+                    continue
 
                 spin = element is not None and element in MAGNETIC_ELEMENTS
 
