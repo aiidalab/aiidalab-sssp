@@ -122,12 +122,16 @@ class SummaryWidget(ipw.VBox):
             y_list = []
             for i in conf_list:
                 output_parameters = _data.get(i, {}).get("output_parameters", {})
-                if measure_type == "delta":
-                    y = output_parameters["delta/natoms"]
-                else:
-                    v0w, b0w, b1w = output_parameters["birch_murnaghan_results"]
-                    v0f, b0f, b1f = output_parameters["reference_wien2k_V0_B0_B1"]
-                    y = rel_errors_vec_length(v0w, b0w, b1w, v0f, b0f, b1f)
+                try:
+                    if measure_type == "delta":
+                        y = output_parameters["delta/natoms"]
+                    else:
+                        v0w, b0w, b1w = output_parameters["birch_murnaghan_results"]
+                        v0f, b0f, b1f = output_parameters["reference_wien2k_V0_B0_B1"]
+                        y = rel_errors_vec_length(v0w, b0w, b1w, v0f, b0f, b1f)
+                except KeyError:
+                    # there is no delta/nu result for this conf of this pseudo
+                    y = None
 
                 if y:
                     y_list.append(round(y, 3))
