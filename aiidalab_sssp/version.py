@@ -3,4 +3,4 @@
 
 """This module contains project version information."""
 
-__version__ = "v22.06.1"
+__version__ = "v23.03.0"
