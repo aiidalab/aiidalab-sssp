@@ -188,8 +188,8 @@ class EosComparisonWidget(ipw.VBox):
 
                 # update the configuration dropdown menu and select the first and second pseudo, respectively
                 self.select_pseudo_ref.value = pseudo_list[0]
-                self.select_pseudo_comp.value = pseudo_list[1]
-                self._update_configuration(pseudo_list[0], pseudo_list[1])
+                self.select_pseudo_comp.value = pseudo_list[0]
+                self._update_configuration(pseudo_list[0], pseudo_list[0])
 
                 # add the observer back
                 self._observer_on_for_pseudos_dropdown()
