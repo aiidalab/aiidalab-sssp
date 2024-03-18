@@ -1,6 +1,7 @@
 """Moudle contains widgets for accuracy delat results inspect.
 The widget EosComparisonWidget for compare Eos fit line of a given pseudos in the given configuration.
 The widget AccuracyMeritWidget showing Nicola's Nu measure of all pseudos in all configurations"""
+
 import ipywidgets as ipw
 import matplotlib.pyplot as plt
 import numpy as np

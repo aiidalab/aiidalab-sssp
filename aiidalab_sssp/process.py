@@ -1,4 +1,5 @@
 """Widgets related to process management."""
+
 from dataclasses import dataclass
 from threading import Event, Lock, Thread
 

@@ -26,7 +26,7 @@ def viewer(obj, downloadable=True, **kwargs):
     try:
         _viewer = AIIDA_VIEWER_MAPPING[obj.node_type]
         return _viewer(obj, downloadable=downloadable, **kwargs)
-    except (KeyError) as exc:
+    except KeyError as exc:
         if obj.node_type in str(exc):
             warnings.warn(
                 "Did not find an appropriate viewer for the {} object. Returning the object "
