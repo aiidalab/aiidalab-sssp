@@ -2,7 +2,7 @@
 repos:
 
     - repo: https://github.com/pre-commit/pre-commit-hooks
-      rev: v4.3.0
+      rev: v4.5.0
       hooks:
           - id: check-json
           - id: check-yaml
@@ -10,18 +10,18 @@ repos:
           - id: trailing-whitespace
 
     - repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
-      rev: 0.2.2
+      rev: 0.2.3
       hooks:
           - id: yamlfmt
 
     - repo: https://github.com/psf/black
-      rev: 22.6.0
+      rev: 24.3.0
       hooks:
           - id: black
             language_version: python3 # Should be a command that runs python3.6+
 
     - repo: https://github.com/PyCQA/flake8
-      rev: 4.0.1
+      rev: 7.0.0
       hooks:
           - id: flake8
             args: [--count, --show-source, --statistics]
@@ -29,22 +29,22 @@ repos:
                 - flake8-bugbear==21.3.1
 
     - repo: https://github.com/pycqa/isort
-      rev: 5.12.0
+      rev: 5.13.2
       hooks:
           - id: isort
             args: [--profile, black, --filter-files]
 
     - repo: https://github.com/asottile/setup-cfg-fmt
-      rev: v1.20.1
+      rev: v2.5.0
       hooks:
           - id: setup-cfg-fmt
 
     - repo: https://github.com/sirosen/check-jsonschema
-      rev: 0.17.0
+      rev: 0.28.0
       hooks:
           - id: check-github-workflows
 
     - repo: https://github.com/kynan/nbstripout
-      rev: 0.6.1
+      rev: 0.7.1
       hooks:
           - id: nbstripout
